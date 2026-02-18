@@ -40,7 +40,7 @@ Add to your `platformio.ini`:
 
 ```ini
 lib_deps =
-    espai
+    enkei0x/ESPAI@^0.6.1
 ```
 
 ### Arduino IDE

@@ -1,6 +1,6 @@
 {
     "name": "ESPAI",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "description": "Bring GPT and Claude to your ESP32! Lightweight AI client with streaming responses, function calling, and conversation memory. Build voice assistants, smart home controllers, and AI-powered IoT devices with just a few lines of code.",
     "keywords": [
         "ai",
