@@ -1,0 +1,88 @@
+# Syntax highlighting for ESPAI library
+# https://arduino.github.io/arduino-cli/library-specification/#keywords
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ESPAI	KEYWORD1
+AIClient	KEYWORD1
+Provider	KEYWORD1
+Role	KEYWORD1
+ErrorCode	KEYWORD1
+Message	KEYWORD1
+Response	KEYWORD1
+ChatOptions	KEYWORD1
+StreamCallback	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+# AIClient methods
+setProvider	KEYWORD2
+setBaseUrl	KEYWORD2
+setModel	KEYWORD2
+setTimeout	KEYWORD2
+getProvider	KEYWORD2
+getModel	KEYWORD2
+isConfigured	KEYWORD2
+chat	KEYWORD2
+chatStream	KEYWORD2
+getLastError	KEYWORD2
+getLastHttpStatus	KEYWORD2
+reset	KEYWORD2
+
+# Response methods
+totalTokens	KEYWORD2
+ok	KEYWORD2
+fail	KEYWORD2
+
+# Utility functions
+providerToString	KEYWORD2
+roleToString	KEYWORD2
+errorCodeToString	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+# Provider enum values
+OpenAI	LITERAL1
+Anthropic	LITERAL1
+Gemini	LITERAL1
+Ollama	LITERAL1
+Custom	LITERAL1
+
+# Role enum values
+System	LITERAL1
+User	LITERAL1
+Assistant	LITERAL1
+Tool	LITERAL1
+
+# ErrorCode enum values
+None	LITERAL1
+NetworkError	LITERAL1
+Timeout	LITERAL1
+AuthError	LITERAL1
+RateLimited	LITERAL1
+InvalidRequest	LITERAL1
+ServerError	LITERAL1
+ParseError	LITERAL1
+OutOfMemory	LITERAL1
+ProviderNotSupported	LITERAL1
+NotConfigured	LITERAL1
+StreamingError	LITERAL1
+
+# Config defines
+ESPAI_ENABLE_STREAMING	LITERAL1
+ESPAI_ENABLE_TOOLS	LITERAL1
+ESPAI_PROVIDER_OPENAI	LITERAL1
+ESPAI_PROVIDER_ANTHROPIC	LITERAL1
+ESPAI_PROVIDER_GEMINI	LITERAL1
+ESPAI_PROVIDER_OLLAMA	LITERAL1
+ESPAI_MAX_MESSAGES	LITERAL1
+ESPAI_HTTP_TIMEOUT_MS	LITERAL1
+ESPAI_MAX_TOOLS	LITERAL1
+ESPAI_DEBUG	LITERAL1
+ESPAI_VERSION	LITERAL1
