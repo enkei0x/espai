@@ -3,6 +3,7 @@
 #include <unity.h>
 #include "providers/OpenAIProvider.h"
 #include "providers/ProviderFactory.h"
+#include "http/SSEParser.h"
 #include <ArduinoJson.h>
 
 using namespace ESPAI;
@@ -227,32 +228,24 @@ void test_streaming_parsing_cycle() {
     ProviderFactory::registerProvider(Provider::OpenAI, createOpenAIProvider);
 
     auto provider = ProviderFactory::create(Provider::OpenAI, "test-key");
-    auto* openaiProvider = static_cast<OpenAIProvider*>(provider.get());
+    TEST_ASSERT_EQUAL(SSEFormat::OpenAI, provider->getSSEFormat());
 
+    SSEParser parser(SSEFormat::OpenAI);
     String accumulated;
+    bool isDone = false;
 
-    std::vector<String> chunks = {
-        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}",
-        "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}",
-        "data: {\"choices\":[{\"delta\":{\"content\":\" there\"}}]}",
-        "data: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}",
-        "data: [DONE]"
-    };
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) accumulated += content;
+        if (done) isDone = true;
+    });
 
-    for (const auto& chunk : chunks) {
-        String content;
-        bool done = false;
+    parser.feed("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n");
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n");
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\" there\"}}]}\n");
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n");
+    parser.feed("data: [DONE]\n");
 
-        bool result = openaiProvider->parseStreamChunk(chunk, content, done);
-        TEST_ASSERT_TRUE(result);
-
-        if (done) {
-            break;
-        }
-
-        accumulated += content;
-    }
-
+    TEST_ASSERT_TRUE(isDone);
     TEST_ASSERT_EQUAL_STRING("Hello there!", accumulated.c_str());
 }
 #endif

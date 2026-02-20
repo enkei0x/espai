@@ -3,6 +3,7 @@
 #include <unity.h>
 #include "providers/AnthropicProvider.h"
 #include "providers/ProviderFactory.h"
+#include "http/SSEParser.h"
 #include <ArduinoJson.h>
 
 using namespace ESPAI;
@@ -236,32 +237,24 @@ void test_streaming_parsing_cycle() {
     ProviderFactory::registerProvider(Provider::Anthropic, createAnthropicProvider);
 
     auto provider = ProviderFactory::create(Provider::Anthropic, "test-key");
-    auto* anthropicProvider = static_cast<AnthropicProvider*>(provider.get());
+    TEST_ASSERT_EQUAL(SSEFormat::Anthropic, provider->getSSEFormat());
 
+    SSEParser parser(SSEFormat::Anthropic);
     String accumulated;
+    bool isDone = false;
 
-    std::vector<String> chunks = {
-        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}",
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}",
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" there\"}}",
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"!\"}}",
-        "event: message_stop\ndata: {\"type\":\"message_stop\"}"
-    };
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) accumulated += content;
+        if (done) isDone = true;
+    });
 
-    for (const auto& chunk : chunks) {
-        String content;
-        bool done = false;
+    parser.feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n");
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n");
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" there\"}}\n\n");
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"!\"}}\n\n");
+    parser.feed("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
 
-        bool result = anthropicProvider->parseStreamChunk(chunk, content, done);
-        TEST_ASSERT_TRUE(result);
-
-        if (done) {
-            break;
-        }
-
-        accumulated += content;
-    }
-
+    TEST_ASSERT_TRUE(isDone);
     TEST_ASSERT_EQUAL_STRING("Hello there!", accumulated.c_str());
 }
 #endif

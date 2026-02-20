@@ -3,6 +3,7 @@
 
 #include "../core/AIConfig.h"
 #include "../core/AITypes.h"
+#include "../http/SSEParser.h"
 #include <ArduinoJson.h>
 #include <vector>
 
@@ -53,6 +54,10 @@ public:
     virtual bool supportsStreaming() const { return true; }
     virtual bool supportsTools() const { return false; }
 
+#if ESPAI_ENABLE_STREAMING
+    virtual SSEFormat getSSEFormat() const = 0;
+#endif
+
     virtual void setApiKey(const String& key) { _apiKey = key; }
     virtual void setModel(const String& model) { _model = model; }
     virtual void setBaseUrl(const String& url) { _baseUrl = url; }
@@ -92,10 +97,6 @@ protected:
     ) = 0;
 
     virtual Response parseResponse(const String& json) = 0;
-
-#if ESPAI_ENABLE_STREAMING
-    virtual bool parseStreamChunk(const String& chunk, String& content, bool& done) = 0;
-#endif
 
     virtual HttpRequest buildHttpRequest(
         const std::vector<Message>& messages,

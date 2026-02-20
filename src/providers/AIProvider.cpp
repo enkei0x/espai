@@ -73,39 +73,19 @@ bool AIProvider::chatStream(
 
     ESPAI_LOG_D(getName(), "Starting streaming chat to %s", req.url.c_str());
 
-    String lineBuffer;
-    lineBuffer.reserve(512);
-
-    bool success = transport->executeStream(req, [&](const uint8_t* data, size_t len) -> bool {
-        for (size_t i = 0; i < len; i++) {
-            char c = static_cast<char>(data[i]);
-            if (c == '\n') {
-                if (!lineBuffer.isEmpty()) {
-                    String content;
-                    bool done = false;
-
-                    if (parseStreamChunk(lineBuffer, content, done)) {
-                        if (!content.isEmpty()) {
-                            callback(content, false);
-                        }
-                        if (done) {
-                            callback("", true);
-                            lineBuffer = "";
-                            lineBuffer.reserve(512);
-                            return false;
-                        }
-                    }
-                    lineBuffer = "";
-                    lineBuffer.reserve(512);
-                }
-            } else if (c != '\r') {
-                lineBuffer += c;
-            }
-        }
-        return true;
+    SSEParser parser(getSSEFormat());
+    parser.setTimeout(_timeout);
+    parser.setAccumulateContent(false);
+    parser.setContentCallback([&callback](const String& content, bool done) {
+        callback(content, done);
     });
 
-    return success;
+    bool success = transport->executeStream(req, [&parser](const uint8_t* data, size_t len) -> bool {
+        parser.feed(reinterpret_cast<const char*>(data), len);
+        return !parser.isDone() && !parser.hasError();
+    });
+
+    return success && !parser.hasError();
 #else
     (void)messages;
     (void)options;

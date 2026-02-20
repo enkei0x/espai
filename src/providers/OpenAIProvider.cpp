@@ -171,57 +171,6 @@ Response OpenAIProvider::parseResponse(const String& json) {
     return response;
 }
 
-#if ESPAI_ENABLE_STREAMING
-bool OpenAIProvider::parseStreamChunk(const String& chunk, String& content, bool& done) {
-    done = false;
-    content = "";
-
-    if (chunk.indexOf("[DONE]") != -1) {
-        done = true;
-        return true;
-    }
-
-    int dataPos = chunk.indexOf("data:");
-    String jsonStr;
-    if (dataPos == -1) {
-        jsonStr = chunk;
-    } else {
-        unsigned int jsonStart = dataPos + 5;
-        while (jsonStart < chunk.length() && chunk[jsonStart] == ' ') {
-            jsonStart++;
-        }
-        jsonStr = chunk.substring(jsonStart);
-    }
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonStr);
-    if (error) {
-        return false;
-    }
-
-    if (doc["choices"].isNull()) {
-        return false;
-    }
-
-    JsonArray choices = doc["choices"];
-    if (choices.size() == 0) {
-        return true;
-    }
-
-    JsonObject firstChoice = choices[0];
-    if (firstChoice["delta"].isNull()) {
-        return true;
-    }
-
-    JsonObject delta = firstChoice["delta"];
-    if (!delta["content"].isNull()) {
-        content = delta["content"].as<String>();
-    }
-
-    return true;
-}
-#endif
-
 #if ESPAI_ENABLE_TOOLS
 Message OpenAIProvider::getAssistantMessageWithToolCalls(const String& content) const {
     Message msg(Role::Assistant, content);

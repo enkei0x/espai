@@ -188,62 +188,6 @@ Response AnthropicProvider::parseResponse(const String& json) {
     return response;
 }
 
-#if ESPAI_ENABLE_STREAMING
-bool AnthropicProvider::parseStreamChunk(const String& chunk, String& content, bool& done) {
-    done = false;
-    content = "";
-
-    int eventPos = chunk.indexOf("event:");
-    int dataPos = chunk.indexOf("data:");
-
-    if (eventPos != -1) {
-        unsigned int eventStart = eventPos + 6;
-        while (eventStart < chunk.length() && chunk[eventStart] == ' ') {
-            eventStart++;
-        }
-        int eventEnd = chunk.indexOf('\n', eventStart);
-        if (eventEnd == -1) {
-            eventEnd = chunk.length();
-        }
-        String eventType = chunk.substring(eventStart, eventEnd);
-
-        if (eventType == "message_stop") {
-            done = true;
-            return true;
-        }
-    }
-
-    if (dataPos == -1) {
-        return true;
-    }
-
-    unsigned int jsonStart = dataPos + 5;
-    while (jsonStart < chunk.length() && chunk[jsonStart] == ' ') {
-        jsonStart++;
-    }
-    String jsonStr = chunk.substring(jsonStart);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonStr);
-    if (error) {
-        return true;
-    }
-
-    const char* type = doc["type"] | "";
-
-    if (strcmp(type, "content_block_delta") == 0) {
-        JsonObject delta = doc["delta"];
-        const char* deltaType = delta["type"] | "";
-
-        if (strcmp(deltaType, "text_delta") == 0) {
-            content = delta["text"].as<String>();
-        }
-    }
-
-    return true;
-}
-#endif
-
 #if ESPAI_ENABLE_TOOLS
 Message AnthropicProvider::getAssistantMessageWithToolCalls(const String& content) const {
     Message msg(Role::Assistant, content);

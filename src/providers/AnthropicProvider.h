@@ -36,7 +36,7 @@ public:
     Response parseResponse(const String& json) override;
 
 #if ESPAI_ENABLE_STREAMING
-    bool parseStreamChunk(const String& chunk, String& content, bool& done) override;
+    SSEFormat getSSEFormat() const override { return SSEFormat::Anthropic; }
 #endif
 
     String extractSystemPrompt(const std::vector<Message>& messages);

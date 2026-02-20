@@ -42,9 +42,11 @@ void SSEParser::feed(const char* data, size_t len) {
     }
 
     updateActivity();
-    for (size_t i = 0; i < len; ++i) {
-        _buffer += data[i];
-    }
+#ifdef ARDUINO
+    _buffer.concat(data, len);
+#else
+    _buffer.append(data, len);
+#endif
     processBuffer();
 }
 

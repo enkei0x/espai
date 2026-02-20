@@ -2,6 +2,7 @@
 
 #include <unity.h>
 #include "providers/AnthropicProvider.h"
+#include "http/SSEParser.h"
 
 using namespace ESPAI;
 
@@ -254,91 +255,102 @@ void test_parse_response_clears_previous_tool_uses() {
 
 #if ESPAI_ENABLE_STREAMING
 void test_parse_stream_chunk_content_block_delta() {
-    String chunk = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}";
+    TEST_ASSERT_EQUAL(SSEFormat::Anthropic, provider->getSSEFormat());
 
-    String content;
-    bool done = false;
+    SSEParser parser(SSEFormat::Anthropic);
+    String result;
+    bool isDone = false;
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) result += content;
+        if (done) isDone = true;
+    });
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(done);
-    TEST_ASSERT_EQUAL_STRING("Hello", content.c_str());
+    parser.feed("event: content_block_delta\n");
+    parser.feed("data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n");
+
+    TEST_ASSERT_EQUAL_STRING("Hello", result.c_str());
+    TEST_ASSERT_FALSE(isDone);
 }
 
 void test_parse_stream_chunk_message_stop() {
-    String chunk = "event: message_stop\ndata: {\"type\":\"message_stop\"}";
+    SSEParser parser(SSEFormat::Anthropic);
+    bool isDone = false;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)content;
+        if (done) isDone = true;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("event: message_stop\n");
+    parser.feed("data: {\"type\":\"message_stop\"}\n\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(done);
+    TEST_ASSERT_TRUE(isDone);
 }
 
 void test_parse_stream_chunk_content_block_start() {
-    String chunk = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}";
+    SSEParser parser(SSEFormat::Anthropic);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("event: content_block_start\n");
+    parser.feed("data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(done);
-    TEST_ASSERT_TRUE(content.isEmpty());
+    TEST_ASSERT_TRUE(result.isEmpty());
 }
 
 void test_parse_stream_chunk_multiple_deltas() {
-    String accumulated;
+    SSEParser parser(SSEFormat::Anthropic);
+    String result;
+    bool isDone = false;
 
-    std::vector<String> chunks = {
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}",
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" there\"}}",
-        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"!\"}}",
-        "event: message_stop\ndata: {\"type\":\"message_stop\"}"
-    };
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) result += content;
+        if (done) isDone = true;
+    });
 
-    for (const auto& chunk : chunks) {
-        String content;
-        bool done = false;
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n");
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\" there\"}}\n\n");
+    parser.feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"!\"}}\n\n");
+    parser.feed("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
 
-        provider->parseStreamChunk(chunk, content, done);
-
-        if (done) {
-            break;
-        }
-        accumulated += content;
-    }
-
-    TEST_ASSERT_EQUAL_STRING("Hello there!", accumulated.c_str());
+    TEST_ASSERT_EQUAL_STRING("Hello there!", result.c_str());
+    TEST_ASSERT_TRUE(isDone);
 }
 
 void test_parse_stream_chunk_data_only() {
-    String chunk = "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Test\"}}";
+    SSEParser parser(SSEFormat::Anthropic);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Test\"}}\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_EQUAL_STRING("Test", content.c_str());
+    TEST_ASSERT_EQUAL_STRING("Test", result.c_str());
 }
 
 void test_parse_stream_chunk_message_delta() {
-    String chunk = "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}";
+    SSEParser parser(SSEFormat::Anthropic);
+    String result;
+    bool isDone = false;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) result += content;
+        if (done) isDone = true;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("event: message_delta\n");
+    parser.feed("data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(done);
-    TEST_ASSERT_TRUE(content.isEmpty());
+    TEST_ASSERT_TRUE(result.isEmpty());
+    TEST_ASSERT_FALSE(isDone);
 }
 #endif
 

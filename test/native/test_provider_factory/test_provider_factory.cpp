@@ -37,12 +37,7 @@ protected:
     }
 
 #if ESPAI_ENABLE_STREAMING
-    bool parseStreamChunk(const String& chunk, String& content, bool& done) override {
-        (void)chunk;
-        content = "";
-        done = false;
-        return true;
-    }
+    ESPAI::SSEFormat getSSEFormat() const override { return ESPAI::SSEFormat::OpenAI; }
 #endif
 };
 
