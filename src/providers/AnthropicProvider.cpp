@@ -1,10 +1,6 @@
 #include "AnthropicProvider.h"
 #include <ArduinoJson.h>
 
-#ifdef ARDUINO
-#include "../http/HttpTransportESP32.h"
-#endif
-
 #if ESPAI_PROVIDER_ANTHROPIC
 
 namespace ESPAI {
@@ -78,7 +74,6 @@ String AnthropicProvider::buildRequestBody(
             toolResult["tool_use_id"] = msg.name.c_str();
             toolResult["content"] = msg.content.c_str();
         } else if (msg.role == Role::Assistant && msg.hasToolCalls()) {
-            // Assistant message with tool_use content blocks
             m["role"] = "assistant";
             JsonDocument contentDoc;
             deserializeJson(contentDoc, msg.toolCallsJson);
@@ -109,7 +104,6 @@ String AnthropicProvider::buildRequestBody(
             if (!tool.description.isEmpty()) {
                 t["description"] = tool.description.c_str();
             }
-            // Map parametersJson to input_schema for Anthropic API
             if (!tool.parametersJson.isEmpty()) {
                 JsonDocument schemaDoc;
                 deserializeJson(schemaDoc, tool.parametersJson);
@@ -194,111 +188,7 @@ Response AnthropicProvider::parseResponse(const String& json) {
     return response;
 }
 
-Response AnthropicProvider::chat(
-    const std::vector<Message>& messages,
-    const ChatOptions& options
-) {
-    if (!isConfigured()) {
-        return Response::fail(ErrorCode::NotConfigured, "Provider not configured");
-    }
-
-#ifdef ARDUINO
-    HttpTransport* transport = getDefaultTransport();
-    if (transport == nullptr) {
-        return Response::fail(ErrorCode::NotConfigured, "HTTP transport not available");
-    }
-
-    if (!transport->isReady()) {
-        return Response::fail(ErrorCode::NetworkError, "Network not ready");
-    }
-
-    HttpRequest req = buildHttpRequest(messages, options);
-    ESPAI_LOG_D("Anthropic", "Sending chat request to %s", req.url.c_str());
-
-    HttpResponse httpResp = transport->execute(req);
-
-    if (!httpResp.success) {
-        return handleHttpError(httpResp.statusCode, httpResp.body);
-    }
-
-    Response response = parseResponse(httpResp.body);
-    response.httpStatus = httpResp.statusCode;
-
-    return response;
-#else
-    (void)messages;
-    (void)options;
-    return Response::fail(ErrorCode::NotConfigured, "HTTP client not available in native build");
-#endif
-}
-
 #if ESPAI_ENABLE_STREAMING
-bool AnthropicProvider::chatStream(
-    const std::vector<Message>& messages,
-    const ChatOptions& options,
-    StreamCallback callback
-) {
-    if (!isConfigured()) {
-        return false;
-    }
-
-#ifdef ARDUINO
-    HttpTransport* transport = getDefaultTransport();
-    if (transport == nullptr || !transport->isReady()) {
-        return false;
-    }
-
-    HttpRequest req = buildHttpRequest(messages, options);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, req.body);
-    if (error) {
-        return false;
-    }
-    doc["stream"] = true;
-    req.body = "";
-    serializeJson(doc, req.body);
-
-    ESPAI_LOG_D("Anthropic", "Starting streaming chat to %s", req.url.c_str());
-
-    String lineBuffer;
-
-    bool success = transport->executeStream(req, [&](const uint8_t* data, size_t len) -> bool {
-        for (size_t i = 0; i < len; i++) {
-            char c = static_cast<char>(data[i]);
-            if (c == '\n') {
-                if (!lineBuffer.isEmpty()) {
-                    String content;
-                    bool done = false;
-
-                    if (parseStreamChunk(lineBuffer, content, done)) {
-                        if (!content.isEmpty()) {
-                            callback(content, false);
-                        }
-                        if (done) {
-                            callback("", true);
-                            lineBuffer = "";
-                            return false;
-                        }
-                    }
-                    lineBuffer = "";
-                }
-            } else if (c != '\r') {
-                lineBuffer += c;
-            }
-        }
-        return true;
-    });
-
-    return success;
-#else
-    (void)messages;
-    (void)options;
-    (void)callback;
-    return false;
-#endif
-}
-
 bool AnthropicProvider::parseStreamChunk(const String& chunk, String& content, bool& done) {
     done = false;
     content = "";
@@ -355,40 +245,25 @@ bool AnthropicProvider::parseStreamChunk(const String& chunk, String& content, b
 #endif
 
 #if ESPAI_ENABLE_TOOLS
-void AnthropicProvider::addTool(const Tool& tool) {
-    if (_tools.size() < ESPAI_MAX_TOOLS) {
-        _tools.push_back(tool);
-    }
-}
-
-void AnthropicProvider::clearTools() {
-    _tools.clear();
-    _lastToolCalls.clear();
-}
-
 Message AnthropicProvider::getAssistantMessageWithToolCalls(const String& content) const {
     Message msg(Role::Assistant, content);
 
     if (!_lastToolCalls.empty()) {
-        // Build tool_use content blocks JSON array for Anthropic format
         JsonDocument doc;
         JsonArray arr = doc.to<JsonArray>();
 
-        // Add text content block if present
         if (!content.isEmpty()) {
             JsonObject textBlock = arr.add<JsonObject>();
             textBlock["type"] = "text";
             textBlock["text"] = content.c_str();
         }
 
-        // Add tool_use blocks
         for (const auto& toolCall : _lastToolCalls) {
             JsonObject tu = arr.add<JsonObject>();
             tu["type"] = "tool_use";
             tu["id"] = toolCall.id.c_str();
             tu["name"] = toolCall.name.c_str();
 
-            // Parse arguments JSON and add as input object
             JsonDocument inputDoc;
             deserializeJson(inputDoc, toolCall.arguments);
             tu["input"] = inputDoc.as<JsonObject>();

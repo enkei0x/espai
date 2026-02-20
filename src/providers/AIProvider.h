@@ -34,17 +34,17 @@ class AIProvider {
 public:
     virtual ~AIProvider() = default;
 
-    virtual Response chat(
+    Response chat(
         const std::vector<Message>& messages,
         const ChatOptions& options
-    ) = 0;
+    );
 
 #if ESPAI_ENABLE_STREAMING
-    virtual bool chatStream(
+    bool chatStream(
         const std::vector<Message>& messages,
         const ChatOptions& options,
         StreamCallback callback
-    ) = 0;
+    );
 #endif
 
     virtual const char* getName() const = 0;
@@ -67,11 +67,24 @@ public:
         return _apiKey.length() > 0 && _model.length() > 0;
     }
 
+#if ESPAI_ENABLE_TOOLS
+    void addTool(const Tool& tool);
+    void clearTools();
+    const std::vector<ToolCall>& getLastToolCalls() const { return _lastToolCalls; }
+    bool hasToolCalls() const { return !_lastToolCalls.empty(); }
+    virtual Message getAssistantMessageWithToolCalls(const String& content = "") const = 0;
+#endif
+
 protected:
     String _apiKey;
     String _model;
     String _baseUrl;
     uint32_t _timeout = ESPAI_HTTP_TIMEOUT_MS;
+
+#if ESPAI_ENABLE_TOOLS
+    std::vector<Tool> _tools;
+    std::vector<ToolCall> _lastToolCalls;
+#endif
 
     virtual String buildRequestBody(
         const std::vector<Message>& messages,
@@ -79,6 +92,10 @@ protected:
     ) = 0;
 
     virtual Response parseResponse(const String& json) = 0;
+
+#if ESPAI_ENABLE_STREAMING
+    virtual bool parseStreamChunk(const String& chunk, String& content, bool& done) = 0;
+#endif
 
     virtual HttpRequest buildHttpRequest(
         const std::vector<Message>& messages,

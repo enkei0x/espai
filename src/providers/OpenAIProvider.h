@@ -20,25 +20,8 @@ public:
     Provider getType() const override { return Provider::OpenAI; }
     bool supportsTools() const override { return true; }
 
-    Response chat(
-        const std::vector<Message>& messages,
-        const ChatOptions& options
-    ) override;
-
-#if ESPAI_ENABLE_STREAMING
-    bool chatStream(
-        const std::vector<Message>& messages,
-        const ChatOptions& options,
-        StreamCallback callback
-    ) override;
-#endif
-
 #if ESPAI_ENABLE_TOOLS
-    void addTool(const Tool& tool);
-    void clearTools();
-    const std::vector<ToolCall>& getLastToolCalls() const { return _lastToolCalls; }
-    bool hasToolCalls() const { return !_lastToolCalls.empty(); }
-    Message getAssistantMessageWithToolCalls(const String& content = "") const;
+    Message getAssistantMessageWithToolCalls(const String& content = "") const override;
 #endif
 
     HttpRequest buildHttpRequest(
@@ -54,13 +37,7 @@ public:
     Response parseResponse(const String& json) override;
 
 #if ESPAI_ENABLE_STREAMING
-    bool parseStreamChunk(const String& chunk, String& content, bool& done);
-#endif
-
-private:
-#if ESPAI_ENABLE_TOOLS
-    std::vector<Tool> _tools;
-    std::vector<ToolCall> _lastToolCalls;
+    bool parseStreamChunk(const String& chunk, String& content, bool& done) override;
 #endif
 };
 
