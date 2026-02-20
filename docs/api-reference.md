@@ -352,3 +352,44 @@ auto provider = ProviderFactory::create(Provider::OpenAI, "api-key", "model");
 // Check
 bool registered = ProviderFactory::isRegistered(Provider::OpenAI);
 ```
+
+---
+
+## HttpTransportESP32
+
+Low-level HTTP transport for ESP32. Most users won't need to interact with this directly.
+
+### SSL/TLS Configuration
+
+ESPAI validates SSL certificates by default using built-in root CA certificates that cover api.openai.com and api.anthropic.com.
+
+```cpp
+#include <ESPAI.h>
+
+// Get the transport instance
+HttpTransportESP32* transport = ESPAI::getESP32Transport();
+
+// Use a custom CA certificate (for custom endpoints)
+transport->setCACert(my_ca_cert);
+
+// DANGEROUS: Disable certificate validation (testing only!)
+transport->setInsecure(true);  // Logs a warning
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `setCACert(cert)` | Set custom CA certificate for SSL validation |
+| `setInsecure(bool)` | Enable/disable certificate validation (default: false) |
+| `setReuse(bool)` | Enable/disable connection reuse |
+| `setFollowRedirects(mode)` | Set redirect following behavior |
+| `isReady()` | Check if WiFi is connected |
+| `getLastError()` | Get last error message |
+
+### Security Notes
+
+- **Default behavior:** SSL certificate validation is ENABLED
+- **Built-in certificates:** DigiCert Global Root CA and ISRG Root X1 (valid until 2031+)
+- **setInsecure(true):** Logs a warning and disables validation - use only for testing
+- **Custom endpoints:** Use `setCACert()` with appropriate certificates

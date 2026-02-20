@@ -32,6 +32,8 @@ Common issues and how to fix them.
 3. **Check HTTPS/SSL**
    - ESP32 needs enough memory for SSL (~40KB)
    - Try increasing heap if low on memory
+   - ESPAI uses secure SSL by default with built-in CA certificates
+   - If you have certificate issues, see the SSL/TLS section below
 
 4. **Firewall/proxy issues**
    - Some networks block API endpoints
@@ -39,7 +41,50 @@ Common issues and how to fix them.
 
 ---
 
-## 🔑 Authentication Errors
+## SSL/TLS Certificate Issues
+
+### "SSL handshake failed" / Certificate errors
+
+**Background:**
+ESPAI validates SSL certificates by default to protect your API keys from man-in-the-middle attacks. The library includes built-in root CA certificates that cover api.openai.com and api.anthropic.com.
+
+**Solutions:**
+
+1. **Verify system time is correct**
+   - SSL certificates are time-sensitive
+   - ESP32 needs correct time for validation
+   ```cpp
+   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+   // Wait for time sync
+   time_t now = time(nullptr);
+   while (now < 8 * 3600 * 2) {
+       delay(500);
+       now = time(nullptr);
+   }
+   ```
+
+2. **Custom endpoint with different certificate**
+   - If using a proxy or custom endpoint, provide the appropriate CA cert:
+   ```cpp
+   HttpTransportESP32* transport = ESPAI::getESP32Transport();
+   transport->setCACert(your_ca_cert);
+   ```
+
+3. **Last resort: Disable validation (NOT recommended)**
+   - Only use this for testing in trusted networks
+   ```cpp
+   HttpTransportESP32* transport = ESPAI::getESP32Transport();
+   transport->setInsecure(true);  // WARNING: Disables SSL validation!
+   ```
+   **Warning:** This makes your API key vulnerable to interception!
+
+4. **Certificate expired**
+   - Built-in certificates are valid until 2031+
+   - If certificates have expired, update the ESPAI library
+
+---
+
+## Authentication Errors
 
 ### "Invalid API key" / "Authentication error"
 

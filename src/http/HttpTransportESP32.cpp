@@ -1,4 +1,5 @@
 #include "HttpTransportESP32.h"
+#include "RootCACerts.h"
 
 #ifdef ARDUINO
 
@@ -21,7 +22,7 @@ HttpTransport* getDefaultTransport() {
 
 HttpTransportESP32::HttpTransportESP32()
     : _caCert(nullptr)
-    , _insecure(true)
+    , _insecure(false)
     , _reuseConnection(true)
     , _followRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS)
 {
@@ -36,6 +37,8 @@ void HttpTransportESP32::configureSSL() {
         _wifiClient.setInsecure();
     } else if (_caCert != nullptr) {
         _wifiClient.setCACert(_caCert);
+    } else {
+        _wifiClient.setCACert(ESPAI_CA_BUNDLE);
     }
 }
 
@@ -50,9 +53,10 @@ void HttpTransportESP32::setCACert(const char* cert) {
 void HttpTransportESP32::setInsecure(bool insecure) {
     _insecure = insecure;
     if (insecure) {
+        ESPAI_LOG_W("HTTP", "SSL certificate validation disabled! This is insecure and vulnerable to MITM attacks.");
         _wifiClient.setInsecure();
-    } else if (_caCert != nullptr) {
-        _wifiClient.setCACert(_caCert);
+    } else {
+        configureSSL();
     }
 }
 
