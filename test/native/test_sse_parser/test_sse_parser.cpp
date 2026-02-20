@@ -333,6 +333,85 @@ void test_content_with_quotes() {
     TEST_ASSERT_EQUAL_STRING("He said \"hi\"", lastContent.c_str());
 }
 
+// Gemini single chunk tests
+
+void test_single_chunk_gemini() {
+    parser->setFormat(SSEFormat::Gemini);
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hi\"}]}}]}\n\n");
+
+    TEST_ASSERT_EQUAL(1, callbackCount);
+    TEST_ASSERT_EQUAL_STRING("Hi", lastContent.c_str());
+    TEST_ASSERT_FALSE(lastDone);
+}
+
+void test_gemini_done_with_finish_reason() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Done\"}]},\"finishReason\":\"STOP\"}]}\n\n");
+
+    TEST_ASSERT_TRUE(parser->isDone());
+    TEST_ASSERT_TRUE(lastDone);
+    TEST_ASSERT_EQUAL_STRING("Done", parser->getAccumulatedContent().c_str());
+}
+
+void test_gemini_multiple_chunks() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"A\"}]}}]}\n\n");
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"B\"}]}}]}\n\n");
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"C\"}]},\"finishReason\":\"STOP\"}]}\n\n");
+
+    // 3 content callbacks + 1 done callback = 4
+    TEST_ASSERT_EQUAL(4, callbackCount);
+    TEST_ASSERT_EQUAL_STRING("ABC", parser->getAccumulatedContent().c_str());
+    TEST_ASSERT_TRUE(parser->isDone());
+}
+
+void test_gemini_done_stops_processing() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Final\"}]},\"finishReason\":\"STOP\"}]}\n\n");
+    int countAfterDone = callbackCount;
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Ignored\"}]}}]}\n\n");
+    TEST_ASSERT_EQUAL(countAfterDone, callbackCount);
+}
+
+void test_gemini_no_candidates_ignored() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"usageMetadata\":{\"promptTokenCount\":5}}\n\n");
+    TEST_ASSERT_EQUAL(0, callbackCount);
+}
+
+void test_gemini_content_with_newlines() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Line1\\nLine2\"}]}}]}\n\n");
+    TEST_ASSERT_EQUAL_STRING("Line1\nLine2", lastContent.c_str());
+}
+
+void test_gemini_full_sequence() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hello\"}]}}]}\n\n");
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\" there\"}]}}]}\n\n");
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"!\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":5}}\n\n");
+
+    TEST_ASSERT_TRUE(parser->isDone());
+    TEST_ASSERT_EQUAL_STRING("Hello there!", parser->getAccumulatedContent().c_str());
+}
+
+void test_gemini_error_in_stream() {
+    parser->setFormat(SSEFormat::Gemini);
+
+    parser->feed("data: {\"error\":{\"code\":429,\"message\":\"Resource exhausted\"}}\n\n");
+
+    TEST_ASSERT_TRUE(parser->hasError());
+    TEST_ASSERT_EQUAL(ErrorCode::ServerError, parser->getError());
+    TEST_ASSERT_TRUE(parser->getErrorMessage().find("Resource exhausted") != std::string::npos);
+}
+
 // Format switching
 
 void test_format_switching() {
@@ -344,6 +423,11 @@ void test_format_switching() {
     parser->setFormat(SSEFormat::Anthropic);
     parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Anthropic\"}}\n\n");
     TEST_ASSERT_EQUAL_STRING("Anthropic", parser->getAccumulatedContent().c_str());
+
+    parser->reset();
+    parser->setFormat(SSEFormat::Gemini);
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Gemini\"}]}}]}\n\n");
+    TEST_ASSERT_EQUAL_STRING("Gemini", parser->getAccumulatedContent().c_str());
 }
 
 // Constructor tests
@@ -532,6 +616,46 @@ void test_anthropic_stream_mixed_text_and_tool_call() {
     TEST_ASSERT_EQUAL_STRING("{\"location\":\"Paris\"}", toolCallResults[0].arguments.c_str());
 }
 
+void test_gemini_stream_single_tool_call() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Gemini);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"location\":\"Tokyo\"}}}]},\"finishReason\":\"STOP\"}]}\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_TRUE(toolCallResults[0].arguments.find("Tokyo") != std::string::npos);
+    TEST_ASSERT_TRUE(toolCallResults[0].id.find("gemini_tc_") != std::string::npos);
+}
+
+void test_gemini_stream_multiple_tool_calls() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Gemini);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"location\":\"Tokyo\"}}},{\"functionCall\":{\"name\":\"get_time\",\"args\":{\"timezone\":\"JST\"}}}]},\"finishReason\":\"STOP\"}]}\n\n");
+
+    TEST_ASSERT_EQUAL(2, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_time", toolCallResults[1].name.c_str());
+}
+
+void test_gemini_stream_mixed_text_and_tool_call() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Gemini);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Checking...\"}]}}]}\n\n");
+    TEST_ASSERT_EQUAL(0, toolCallResults.size());
+
+    parser->feed("data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"location\":\"Paris\"}}}]},\"finishReason\":\"STOP\"}]}\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("Checking...", parser->getAccumulatedContent().c_str());
+}
+
 void test_tool_calls_cleared_on_reset() {
     parser->setFormat(SSEFormat::OpenAI);
 
@@ -580,6 +704,16 @@ int main(int argc, char** argv) {
     RUN_TEST(test_anthropic_ping);
     RUN_TEST(test_anthropic_full_sequence);
 
+    // Gemini format
+    RUN_TEST(test_single_chunk_gemini);
+    RUN_TEST(test_gemini_done_with_finish_reason);
+    RUN_TEST(test_gemini_multiple_chunks);
+    RUN_TEST(test_gemini_done_stops_processing);
+    RUN_TEST(test_gemini_no_candidates_ignored);
+    RUN_TEST(test_gemini_content_with_newlines);
+    RUN_TEST(test_gemini_full_sequence);
+    RUN_TEST(test_gemini_error_in_stream);
+
     // Cancellation
     RUN_TEST(test_cancel);
 
@@ -624,6 +758,11 @@ int main(int argc, char** argv) {
     RUN_TEST(test_anthropic_stream_single_tool_call);
     RUN_TEST(test_anthropic_stream_multiple_tool_calls);
     RUN_TEST(test_anthropic_stream_mixed_text_and_tool_call);
+
+    // Streaming tool calls - Gemini
+    RUN_TEST(test_gemini_stream_single_tool_call);
+    RUN_TEST(test_gemini_stream_multiple_tool_calls);
+    RUN_TEST(test_gemini_stream_mixed_text_and_tool_call);
 
     // Tool call reset
     RUN_TEST(test_tool_calls_cleared_on_reset);

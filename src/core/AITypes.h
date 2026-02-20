@@ -47,6 +47,16 @@
             return (pos == std::string::npos) ? -1 : static_cast<int>(pos);
         }
 
+        int indexOf(const String& str, unsigned int fromIndex) const {
+            size_t pos = find(str, fromIndex);
+            return (pos == std::string::npos) ? -1 : static_cast<int>(pos);
+        }
+
+        int indexOf(const char* str, unsigned int fromIndex) const {
+            size_t pos = find(str, fromIndex);
+            return (pos == std::string::npos) ? -1 : static_cast<int>(pos);
+        }
+
         String substring(unsigned int beginIndex) const {
             if (beginIndex >= length()) return String("");
             return String(substr(beginIndex));
@@ -192,6 +202,7 @@ struct ChatOptions {
     float topP;
     float frequencyPenalty;
     float presencePenalty;
+    int32_t thinkingBudget; // Gemini 2.5+: thinking token budget. -1 = provider default, 0 = disable thinking.
 
     ChatOptions()
         : temperature(0.7f)
@@ -200,7 +211,8 @@ struct ChatOptions {
         , systemPrompt()
         , topP(1.0f)
         , frequencyPenalty(0.0f)
-        , presencePenalty(0.0f) {}
+        , presencePenalty(0.0f)
+        , thinkingBudget(-1) {}
 };
 
 struct RetryConfig {
@@ -271,18 +283,16 @@ using ToolHandler = std::function<String(const String& args)>;
 /**
  * Unified tool definition for all providers.
  *
- * Both OpenAI and Anthropic use the same JSON schema format for parameters,
- * so this single struct works for both providers. The providers internally
- * map parametersJson to the appropriate field name:
+ * All providers use the same JSON schema format for parameters.
+ * Each provider maps parametersJson to its own field name:
  * - OpenAI: "parameters" in function definition
  * - Anthropic: "input_schema" in tool definition
- *
- * The optional handler field is used by ToolRegistry for local tool execution.
+ * - Gemini: "parameters" in functionDeclarations
  */
 struct Tool {
     String name;
     String description;
-    String parametersJson;  // JSON schema (same format for both providers)
+    String parametersJson;  // JSON schema (same format for all providers)
     ToolHandler handler;    // Optional: for local tool execution via ToolRegistry
 
     Tool() : name(), description(), parametersJson(), handler(nullptr) {}
@@ -295,9 +305,9 @@ struct Tool {
 /**
  * Represents a tool call from the AI response.
  *
- * This unified struct works for both OpenAI and Anthropic:
- * - OpenAI: maps to tool_calls[].function.name and tool_calls[].function.arguments
- * - Anthropic: maps to tool_use content block with name and input
+ * - OpenAI: maps to tool_calls[].function
+ * - Anthropic: maps to tool_use content block
+ * - Gemini: maps to functionCall part (id is synthesized as gemini_tc_N)
  */
 struct ToolCall {
     String id;

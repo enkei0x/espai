@@ -11,24 +11,51 @@
   <a href="https://www.arduino.cc/"><img src="https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino" alt="Arduino"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.espressif.com/"><img src="https://img.shields.io/badge/ESP32-Supported-green?logo=espressif" alt="ESP32"></a>
-  <img src="https://img.shields.io/badge/Tests-353%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-390%20passed-brightgreen" alt="Tests">
 </p>
 
-> 🚀 Bring the power of GPT and Claude to your ESP32 projects!
+> 🚀 Bring the power of GPT, Claude and Gemini to your ESP32 projects!
 
-ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI and Anthropic APIs into your ESP32 projects. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
+ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI, Anthropic and Google Gemini APIs into your ESP32 projects. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
+
+```cpp
+#include <ESPAI.h>
+using namespace ESPAI;
+
+OpenAIProvider ai("sk-your-key");  // or AnthropicProvider / GeminiProvider
+
+std::vector<Message> messages = { Message(Role::User, "Hello from ESP32!") };
+
+Response res = ai.chat(messages, ChatOptions());
+
+Serial.println(res.content);
+```
 
 ---
 
 ## ✨ Features
 
 - 🎯 **Simple API** — Clean, intuitive interface for chat completions
-- 🌊 **Streaming Support** — Real-time token-by-token responses
-- 🛠️ **Tool Calling** — Function calling for agentic workflows
-- 💬 **Conversation History** — Built-in context management
-- 🔄 **Multiple Providers** — OpenAI and Anthropic (Claude) supported
+- 🔒 **Secure by Default** — Embedded root CA certificates for proper TLS verification (no `setInsecure()` hacks)
+- 🌊 **Streaming Support** — Real-time token-by-token responses via SSE
+- 🛠️ **Tool Calling** — Function calling for agentic workflows with unified schema across all providers
+- 💬 **Conversation History** — Built-in multi-turn context management with auto-pruning and serialization
+- 🔄 **Multiple Providers** — OpenAI, Anthropic (Claude) and Google Gemini through a single unified API
 - 📦 **Lightweight** — Minimal memory footprint, optimized for ESP32
 - ⚡ **Non-blocking** — Async-friendly design
+- 🧪 **Well Tested** — 390+ native unit tests, CI-ready
+- 🏗️ **Clean Architecture** — Layered design with separated HTTP transport, providers, and conversation management
+
+---
+
+## 🏆 Why ESPAI?
+
+- **Secure by design** — Embedded root CA certificates for proper TLS verification out of the box
+- **Production-ready** — 390+ unit tests running natively, so you can refactor and ship with confidence
+- **Conversation memory** — Built-in multi-turn history with automatic pruning and JSON serialization
+- **Write once, run on any provider** — Define tools once, unified schema works across OpenAI, Claude, and Gemini
+- **Your choice of tooling** — First-class support for both PlatformIO and Arduino IDE
+- **Modern C++17** — Namespaced, clean layered architecture that's easy to extend and debug
 
 ---
 
@@ -196,6 +223,10 @@ openai.setTimeout(30000);
 // Anthropic (Claude)
 AnthropicProvider claude("sk-ant-...");
 claude.setModel("claude-sonnet-4-20250514");
+
+// Google Gemini
+GeminiProvider gemini("AIza...");
+gemini.setModel("gemini-2.5-flash");
 ```
 
 ---
@@ -253,7 +284,7 @@ To save ~10KB flash, disable unused providers:
 - [x] Tool/function calling
 - [x] Conversation history management
 - [ ] **Ollama** — Local LLM support (run models on your own server)
-- [ ] **Gemini** — Google AI integration
+- [x] **Gemini** — Google AI integration
 - [ ] Vision support (image inputs)
 - [ ] Embeddings API
 
@@ -284,6 +315,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ArduinoJson](https://arduinojson.org/) — JSON parsing
 - [OpenAI](https://openai.com/) — GPT models
 - [Anthropic](https://anthropic.com/) — Claude models
+- [Google Gemini](https://ai.google.dev/) — Gemini models
 
 ---
 

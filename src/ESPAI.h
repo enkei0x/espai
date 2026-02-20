@@ -16,6 +16,10 @@
 #include "providers/AnthropicProvider.h"
 #endif
 
+#if ESPAI_PROVIDER_GEMINI
+#include "providers/GeminiProvider.h"
+#endif
+
 #if ESPAI_ENABLE_STREAMING
 #include "http/SSEParser.h"
 #endif

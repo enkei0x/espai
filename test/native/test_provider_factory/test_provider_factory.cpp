@@ -151,11 +151,35 @@ void test_get_default_base_url_anthropic() {
     );
 }
 
+void test_get_default_base_url_gemini() {
+    TEST_ASSERT_EQUAL_STRING(
+        "https://generativelanguage.googleapis.com/v1beta",
+        ESPAI::ProviderFactory::getDefaultBaseUrl(ESPAI::Provider::Gemini)
+    );
+}
+
 void test_get_default_base_url_ollama() {
     TEST_ASSERT_EQUAL_STRING(
         "http://localhost:11434/api/chat",
         ESPAI::ProviderFactory::getDefaultBaseUrl(ESPAI::Provider::Ollama)
     );
+}
+
+void test_create_gemini_provider() {
+    ESPAI::ProviderFactory::registerProvider(ESPAI::Provider::Gemini, createMockProvider);
+    auto provider = ESPAI::ProviderFactory::create(ESPAI::Provider::Gemini, "gemini-key", "gemini-2.5-flash");
+
+    TEST_ASSERT_NOT_NULL(provider.get());
+    TEST_ASSERT_EQUAL_STRING("gemini-key", provider->getApiKey().c_str());
+    TEST_ASSERT_EQUAL_STRING("gemini-2.5-flash", provider->getModel().c_str());
+}
+
+void test_create_gemini_with_default_model() {
+    ESPAI::ProviderFactory::registerProvider(ESPAI::Provider::Gemini, createMockProvider);
+    auto provider = ESPAI::ProviderFactory::create(ESPAI::Provider::Gemini, "gemini-key");
+
+    TEST_ASSERT_NOT_NULL(provider.get());
+    TEST_ASSERT_EQUAL_STRING(ESPAI_DEFAULT_MODEL_GEMINI, provider->getModel().c_str());
 }
 
 void test_is_registered_false_initially() {
@@ -242,7 +266,11 @@ int main(int argc, char** argv) {
 
     RUN_TEST(test_get_default_base_url_openai);
     RUN_TEST(test_get_default_base_url_anthropic);
+    RUN_TEST(test_get_default_base_url_gemini);
     RUN_TEST(test_get_default_base_url_ollama);
+
+    RUN_TEST(test_create_gemini_provider);
+    RUN_TEST(test_create_gemini_with_default_model);
 
     RUN_TEST(test_is_registered_false_initially);
     RUN_TEST(test_multiple_providers);

@@ -17,9 +17,8 @@
 #define ESPAI_PROVIDER_ANTHROPIC    1
 #endif
 
-// Planned providers - not yet implemented
 #ifndef ESPAI_PROVIDER_GEMINI
-#define ESPAI_PROVIDER_GEMINI       0
+#define ESPAI_PROVIDER_GEMINI       1
 #endif
 
 #ifndef ESPAI_PROVIDER_OLLAMA
@@ -47,7 +46,7 @@
 #endif
 
 #ifndef ESPAI_DEFAULT_MODEL_GEMINI
-#define ESPAI_DEFAULT_MODEL_GEMINI      "gemini-1.5-flash"
+#define ESPAI_DEFAULT_MODEL_GEMINI      "gemini-2.5-flash"
 #endif
 
 #ifndef ESPAI_DEFAULT_MODEL_OLLAMA

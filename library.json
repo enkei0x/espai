@@ -1,7 +1,7 @@
 {
     "name": "ESPAI",
     "version": "0.7.0",
-    "description": "Bring GPT and Claude to your ESP32! Lightweight AI client with streaming responses, function calling, and conversation memory. Build voice assistants, smart home controllers, and AI-powered IoT devices with just a few lines of code.",
+    "description": "Bring GPT, Claude, and Gemini to your ESP32! Lightweight AI client with streaming responses, function calling, and conversation memory. Build voice assistants, smart home controllers, and AI-powered IoT devices with just a few lines of code.",
     "keywords": [
         "ai",
         "openai",
@@ -10,6 +10,8 @@
         "gpt4",
         "anthropic",
         "claude",
+        "google",
+        "gemini",
         "llm",
         "esp32",
         "iot",

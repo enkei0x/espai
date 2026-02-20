@@ -12,7 +12,8 @@ namespace ESPAI {
 
 enum class SSEFormat : uint8_t {
     OpenAI = 0,
-    Anthropic
+    Anthropic,
+    Gemini
 };
 
 struct SSEEvent {
@@ -112,6 +113,7 @@ private:
     void parseAndDispatchContent(const String& data);
     bool parseOpenAIChunk(const String& data, String& content, bool& done);
     bool parseAnthropicChunk(const String& data, String& content, bool& done);
+    bool parseGeminiChunk(const String& data, String& content, bool& done);
     void setError(ErrorCode code, const String& message);
 #if ESPAI_ENABLE_TOOLS
     void finalizeToolCalls();

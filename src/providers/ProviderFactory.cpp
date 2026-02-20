@@ -1,5 +1,17 @@
 #include "ProviderFactory.h"
 
+#if ESPAI_PROVIDER_OPENAI
+#include "OpenAIProvider.h"
+#endif
+
+#if ESPAI_PROVIDER_ANTHROPIC
+#include "AnthropicProvider.h"
+#endif
+
+#if ESPAI_PROVIDER_GEMINI
+#include "GeminiProvider.h"
+#endif
+
 namespace ESPAI {
 
 ProviderCreator ProviderFactory::_creators[MAX_PROVIDERS] = {nullptr};
@@ -11,6 +23,17 @@ void ProviderFactory::ensureInitialized() {
             _creators[i] = nullptr;
         }
         _initialized = true;
+
+        // Auto-register built-in providers
+#if ESPAI_PROVIDER_OPENAI
+        _creators[providerIndex(Provider::OpenAI)] = createOpenAIProvider;
+#endif
+#if ESPAI_PROVIDER_ANTHROPIC
+        _creators[providerIndex(Provider::Anthropic)] = createAnthropicProvider;
+#endif
+#if ESPAI_PROVIDER_GEMINI
+        _creators[providerIndex(Provider::Gemini)] = createGeminiProvider;
+#endif
     }
 }
 
@@ -94,7 +117,7 @@ const char* ProviderFactory::getDefaultBaseUrl(Provider type) {
         case Provider::Anthropic:
             return "https://api.anthropic.com/v1/messages";
         case Provider::Gemini:
-            return "https://generativelanguage.googleapis.com/v1beta/models";
+            return "https://generativelanguage.googleapis.com/v1beta";
         case Provider::Ollama:
             return "http://localhost:11434/api/chat";
         default:
