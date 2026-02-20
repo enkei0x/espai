@@ -139,6 +139,10 @@ void SSEParser::parseAndDispatchContent(const String& data) {
         if (!parseOpenAIChunk(data, content, done)) {
             return;
         }
+    } else if (_format == SSEFormat::Gemini) {
+        if (!parseGeminiChunk(data, content, done)) {
+            return;
+        }
     } else {
         if (!parseAnthropicChunk(data, content, done)) {
             return;
@@ -327,6 +331,76 @@ void SSEParser::finalizeToolCalls() {
     }
 }
 #endif
+
+bool SSEParser::parseGeminiChunk(const String& data, String& content, bool& done) {
+    content = "";
+    done = false;
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, data);
+    if (error) {
+        return false;
+    }
+
+    if (!doc["error"].isNull()) {
+        String errorMsg = doc["error"]["message"].as<String>();
+        if (errorMsg.isEmpty()) {
+            errorMsg = "API error";
+        }
+        setError(ErrorCode::ServerError, errorMsg);
+        return false;
+    }
+
+    if (doc["candidates"].isNull()) {
+        return false;
+    }
+
+    JsonArray candidates = doc["candidates"];
+    if (candidates.size() == 0) {
+        return true;
+    }
+
+    JsonObject firstCandidate = candidates[0];
+
+    if (!firstCandidate["content"].isNull()) {
+        JsonObject contentObj = firstCandidate["content"];
+        if (!contentObj["parts"].isNull()) {
+            JsonArray parts = contentObj["parts"];
+            for (JsonObject part : parts) {
+                if (part["thought"] | false) {
+                    continue;
+                }
+                if (!part["text"].isNull()) {
+                    content += part["text"].as<String>();
+                }
+#if ESPAI_ENABLE_TOOLS
+                if (!part["functionCall"].isNull()) {
+                    JsonObject fc = part["functionCall"];
+                    PendingToolCall tc;
+                    tc.name = fc["name"].as<String>();
+                    String argsStr;
+                    serializeJson(fc["args"], argsStr);
+                    tc.arguments = argsStr;
+                    tc.id = "gemini_tc_" + String(static_cast<int>(_pendingToolCalls.size()));
+                    if (!tc.name.isEmpty()) {
+                        _pendingToolCalls.push_back(tc);
+                    }
+                }
+#endif
+            }
+        }
+    }
+
+    const char* finishReason = firstCandidate["finishReason"] | "";
+    if (strlen(finishReason) > 0) {
+#if ESPAI_ENABLE_TOOLS
+        finalizeToolCalls();
+#endif
+        done = true;
+    }
+
+    return true;
+}
 
 bool SSEParser::checkTimeout() {
     if (_timeoutMs == 0) {

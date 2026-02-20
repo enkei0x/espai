@@ -101,22 +101,24 @@ bool AIProvider::chatStream(
         return false;
     }
 
+    _streamingRequest = true;
     HttpRequest req = buildHttpRequest(messages, options);
+    _streamingRequest = false;
 
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, req.body);
-    if (error) {
-        return false;
+    // Gemini uses URL endpoint for streaming, not "stream":true in body
+    if (getSSEFormat() != SSEFormat::Gemini) {
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, req.body);
+        if (error) {
+            return false;
+        }
+        doc["stream"] = true;
+        req.body = "";
+        serializeJson(doc, req.body);
     }
-    doc["stream"] = true;
-    req.body = "";
-    serializeJson(doc, req.body);
 
     ESPAI_LOG_D(getName(), "Starting streaming chat to %s", req.url.c_str());
 
-    // Note: If a streaming attempt fails after partial data has been sent to
-    // the callback, a retry will deliver a new complete response. The caller
-    // must handle this (e.g., by resetting any accumulated state).
     uint16_t maxAttempts = (_retryConfig.enabled) ? static_cast<uint16_t>(_retryConfig.maxRetries) + 1 : 1;
 
     for (uint16_t attempt = 0; attempt < maxAttempts; attempt++) {

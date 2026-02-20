@@ -89,6 +89,7 @@ protected:
     String _baseUrl;
     uint32_t _timeout = ESPAI_HTTP_TIMEOUT_MS;
     RetryConfig _retryConfig;
+    bool _streamingRequest = false;
 
     static bool isRetryableStatus(int16_t statusCode);
     static uint32_t calculateRetryDelay(const RetryConfig& config, uint8_t attempt, int32_t retryAfterSeconds);
