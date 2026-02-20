@@ -193,6 +193,54 @@ void test_tool_calling() {
 }
 #endif
 
+#if ESPAI_ENABLE_STREAMING && ESPAI_ENABLE_TOOLS
+void test_streaming_tool_calling() {
+    Tool weatherTool;
+    weatherTool.name = "get_weather";
+    weatherTool.description = "Get the current weather for a location";
+    weatherTool.parametersJson = buildToolSchema("location", "string", "City name", true);
+
+    provider->addTool(weatherTool);
+
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "What is the weather in Tokyo?"));
+
+    ChatOptions options;
+    options.maxTokens = 200;
+
+    String accumulated;
+    int chunkCount = 0;
+    bool completed = false;
+
+    bool success = provider->chatStream(messages, options, [&](const String& chunk, bool done) {
+        if (!chunk.isEmpty()) {
+            accumulated += chunk;
+            chunkCount++;
+            Serial.printf("[STREAM] Chunk %d: %s\n", chunkCount, chunk.c_str());
+        }
+        if (done) {
+            completed = true;
+        }
+    });
+
+    Serial.printf("[INFO] Stream tool call: success=%d, chunks=%d, completed=%d\n", success, chunkCount, completed);
+    Serial.printf("[INFO] Has tool calls: %d\n", provider->hasToolCalls());
+
+    String debugMsg = "Stream tool call failed: success=" + String(success) + " completed=" + String(completed);
+    TEST_ASSERT_TRUE_MESSAGE(success, debugMsg.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(completed, "Stream did not complete");
+    TEST_ASSERT_TRUE_MESSAGE(provider->hasToolCalls(), "Expected tool calls after streaming");
+
+    const auto& calls = provider->getLastToolCalls();
+    TEST_ASSERT_GREATER_THAN(0, calls.size());
+    TEST_ASSERT_EQUAL_STRING("get_weather", calls[0].name.c_str());
+    TEST_ASSERT_TRUE_MESSAGE(!calls[0].arguments.isEmpty(), "Tool call arguments should not be empty");
+    Serial.printf("[INFO] Tool: %s, Args: %s\n", calls[0].name.c_str(), calls[0].arguments.c_str());
+
+    provider->clearTools();
+}
+#endif
+
 void test_error_handling_empty_message() {
     std::vector<Message> messages;
     messages.push_back(Message(Role::User, ""));
@@ -298,6 +346,9 @@ void setup() {
 #endif
 #if ESPAI_ENABLE_TOOLS
     RUN_TEST(test_tool_calling);
+#endif
+#if ESPAI_ENABLE_STREAMING && ESPAI_ENABLE_TOOLS
+    RUN_TEST(test_streaming_tool_calling);
 #endif
     RUN_TEST(test_error_handling_empty_message);
     RUN_TEST(test_multi_turn_conversation);

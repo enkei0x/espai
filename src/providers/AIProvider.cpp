@@ -120,12 +120,22 @@ bool AIProvider::chatStream(
     uint16_t maxAttempts = (_retryConfig.enabled) ? static_cast<uint16_t>(_retryConfig.maxRetries) + 1 : 1;
 
     for (uint16_t attempt = 0; attempt < maxAttempts; attempt++) {
+#if ESPAI_ENABLE_TOOLS
+        _lastToolCalls.clear();
+#endif
         SSEParser parser(getSSEFormat());
         parser.setTimeout(_timeout);
         parser.setAccumulateContent(false);
         parser.setContentCallback([&callback](const String& content, bool done) {
             callback(content, done);
         });
+
+#if ESPAI_ENABLE_TOOLS
+        parser.setToolCallCallback(
+            [this](const String& id, const String& name, const String& arguments) {
+                _lastToolCalls.push_back(ToolCall(id, name, arguments));
+            });
+#endif
 
         bool success = transport->executeStream(req, [&parser](const uint8_t* data, size_t len) -> bool {
             parser.feed(reinterpret_cast<const char*>(data), len);
