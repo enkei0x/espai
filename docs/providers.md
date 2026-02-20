@@ -6,8 +6,8 @@ ESPAI supports multiple AI providers. This guide covers the differences and how 
 
 | Provider | Status | Models |
 |----------|--------|--------|
-| OpenAI | ✅ Supported | GPT-4o, GPT-4o-mini, GPT-4-turbo, etc. |
-| Anthropic | ✅ Supported | Claude Opus, Sonnet, Haiku |
+| OpenAI | ✅ Supported | All text models |
+| Anthropic | ✅ Supported | All text models |
 | Gemini | 🔜 Planned | - |
 | Ollama | 🔜 Planned | - |
 
@@ -26,14 +26,13 @@ OpenAIProvider ai("sk-your-api-key");
 
 ### Default Model
 
-`gpt-4o-mini` - Fast and cost-effective.
+`gpt-4.1-mini`
 
 ### Change Model
 
 ```cpp
-ai.setModel("gpt-4o");           // Most capable
-ai.setModel("gpt-4-turbo");      // Fast + capable
-ai.setModel("gpt-3.5-turbo");    // Legacy, cheapest
+ai.setModel("gpt-4.1");
+ai.setModel("gpt-4.1-nano");
 ```
 
 ### Custom Endpoint
@@ -63,14 +62,13 @@ AnthropicProvider claude("sk-ant-your-api-key");
 
 ### Default Model
 
-`claude-sonnet-4-20250514` - Balanced performance.
+`claude-sonnet-4-20250514`
 
 ### Change Model
 
 ```cpp
-claude.setModel("claude-opus-4-20250514");    // Most capable
-claude.setModel("claude-sonnet-4-20250514");  // Balanced
-claude.setModel("claude-3-haiku-20240307");   // Fast + cheap
+claude.setModel("claude-opus-4-20250514");
+claude.setModel("claude-haiku-4-5-20251001");
 ```
 
 ### API Version

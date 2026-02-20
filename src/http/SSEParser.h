@@ -4,6 +4,7 @@
 #include "../core/AIConfig.h"
 #include "../core/AITypes.h"
 #include <functional>
+#include <vector>
 
 #if ESPAI_ENABLE_STREAMING
 
@@ -22,11 +23,25 @@ struct SSEEvent {
     SSEEvent() : isDone(false) {}
 };
 
+#if ESPAI_ENABLE_TOOLS
+struct PendingToolCall {
+    String id;
+    String name;
+    String arguments;
+
+    PendingToolCall() : id(), name(), arguments() {}
+    PendingToolCall(const String& i, const String& n) : id(i), name(n), arguments() {}
+};
+#endif
+
 class SSEParser {
 public:
     using EventCallback = std::function<void(const SSEEvent& event)>;
     using ContentCallback = std::function<void(const String& content, bool done)>;
     using ErrorCallback = std::function<void(ErrorCode code, const String& message)>;
+#if ESPAI_ENABLE_TOOLS
+    using ToolCallCallback = std::function<void(const String& id, const String& name, const String& arguments)>;
+#endif
 
     SSEParser();
     explicit SSEParser(SSEFormat format);
@@ -37,6 +52,10 @@ public:
     void setEventCallback(EventCallback cb) { _eventCallback = cb; }
     void setContentCallback(ContentCallback cb) { _contentCallback = cb; }
     void setErrorCallback(ErrorCallback cb) { _errorCallback = cb; }
+#if ESPAI_ENABLE_TOOLS
+    void setToolCallCallback(ToolCallCallback cb) { _toolCallCallback = cb; }
+    const std::vector<PendingToolCall>& getToolCalls() const { return _pendingToolCalls; }
+#endif
 
     void setTimeout(uint32_t timeoutMs) { _timeoutMs = timeoutMs; }
     uint32_t getTimeout() const { return _timeoutMs; }
@@ -71,6 +90,11 @@ private:
     EventCallback _eventCallback;
     ContentCallback _contentCallback;
     ErrorCallback _errorCallback;
+#if ESPAI_ENABLE_TOOLS
+    ToolCallCallback _toolCallCallback;
+    std::vector<PendingToolCall> _pendingToolCalls;
+    int16_t _currentToolCallIndex;
+#endif
 
     uint32_t _timeoutMs;
     uint32_t _lastActivityMs;
@@ -89,6 +113,9 @@ private:
     bool parseOpenAIChunk(const String& data, String& content, bool& done);
     bool parseAnthropicChunk(const String& data, String& content, bool& done);
     void setError(ErrorCode code, const String& message);
+#if ESPAI_ENABLE_TOOLS
+    void finalizeToolCalls();
+#endif
 
     uint32_t millis() const;
 };

@@ -3,6 +3,7 @@
 
 #include "../core/AIConfig.h"
 #include "../core/AITypes.h"
+#include "../http/SSEParser.h"
 #include <ArduinoJson.h>
 #include <vector>
 
@@ -26,25 +27,26 @@ struct HttpResponse {
     int16_t statusCode;
     String body;
     bool success;
+    int32_t retryAfterSeconds;
 
-    HttpResponse() : statusCode(0), success(false) {}
+    HttpResponse() : statusCode(0), success(false), retryAfterSeconds(-1) {}
 };
 
 class AIProvider {
 public:
     virtual ~AIProvider() = default;
 
-    virtual Response chat(
+    Response chat(
         const std::vector<Message>& messages,
         const ChatOptions& options
-    ) = 0;
+    );
 
 #if ESPAI_ENABLE_STREAMING
-    virtual bool chatStream(
+    bool chatStream(
         const std::vector<Message>& messages,
         const ChatOptions& options,
         StreamCallback callback
-    ) = 0;
+    );
 #endif
 
     virtual const char* getName() const = 0;
@@ -53,10 +55,16 @@ public:
     virtual bool supportsStreaming() const { return true; }
     virtual bool supportsTools() const { return false; }
 
+#if ESPAI_ENABLE_STREAMING
+    virtual SSEFormat getSSEFormat() const = 0;
+#endif
+
     virtual void setApiKey(const String& key) { _apiKey = key; }
     virtual void setModel(const String& model) { _model = model; }
     virtual void setBaseUrl(const String& url) { _baseUrl = url; }
     virtual void setTimeout(uint32_t timeoutMs) { _timeout = timeoutMs; }
+    void setRetryConfig(const RetryConfig& config) { _retryConfig = config; }
+    const RetryConfig& getRetryConfig() const { return _retryConfig; }
 
     const String& getApiKey() const { return _apiKey; }
     const String& getModel() const { return _model; }
@@ -67,11 +75,28 @@ public:
         return _apiKey.length() > 0 && _model.length() > 0;
     }
 
+#if ESPAI_ENABLE_TOOLS
+    void addTool(const Tool& tool);
+    void clearTools();
+    const std::vector<ToolCall>& getLastToolCalls() const { return _lastToolCalls; }
+    bool hasToolCalls() const { return !_lastToolCalls.empty(); }
+    virtual Message getAssistantMessageWithToolCalls(const String& content = "") const = 0;
+#endif
+
 protected:
     String _apiKey;
     String _model;
     String _baseUrl;
     uint32_t _timeout = ESPAI_HTTP_TIMEOUT_MS;
+    RetryConfig _retryConfig;
+
+    static bool isRetryableStatus(int16_t statusCode);
+    static uint32_t calculateRetryDelay(const RetryConfig& config, uint8_t attempt, int32_t retryAfterSeconds);
+
+#if ESPAI_ENABLE_TOOLS
+    std::vector<Tool> _tools;
+    std::vector<ToolCall> _lastToolCalls;
+#endif
 
     virtual String buildRequestBody(
         const std::vector<Message>& messages,

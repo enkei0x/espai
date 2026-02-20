@@ -16,26 +16,12 @@ public:
     Provider getType() const override { return Provider::Anthropic; }
     bool supportsTools() const override { return true; }
 
-    Response chat(
-        const std::vector<Message>& messages,
-        const ChatOptions& options
-    ) override;
-
-#if ESPAI_ENABLE_STREAMING
-    bool chatStream(
-        const std::vector<Message>& messages,
-        const ChatOptions& options,
-        StreamCallback callback
-    ) override;
-#endif
-
 #if ESPAI_ENABLE_TOOLS
-    void addTool(const Tool& tool);
-    void clearTools();
-    const std::vector<ToolCall>& getLastToolCalls() const { return _lastToolCalls; }
-    bool hasToolCalls() const { return !_lastToolCalls.empty(); }
-    Message getAssistantMessageWithToolCalls(const String& content = "") const;
+    Message getAssistantMessageWithToolCalls(const String& content = "") const override;
 #endif
+
+    void setApiVersion(const String& version) { _apiVersion = version; }
+    const String& getApiVersion() const { return _apiVersion; }
 
     HttpRequest buildHttpRequest(
         const std::vector<Message>& messages,
@@ -50,21 +36,13 @@ public:
     Response parseResponse(const String& json) override;
 
 #if ESPAI_ENABLE_STREAMING
-    bool parseStreamChunk(const String& chunk, String& content, bool& done);
+    SSEFormat getSSEFormat() const override { return SSEFormat::Anthropic; }
 #endif
 
     String extractSystemPrompt(const std::vector<Message>& messages);
 
-    void setApiVersion(const String& version) { _apiVersion = version; }
-    const String& getApiVersion() const { return _apiVersion; }
-
 private:
     String _apiVersion;
-
-#if ESPAI_ENABLE_TOOLS
-    std::vector<Tool> _tools;
-    std::vector<ToolCall> _lastToolCalls;
-#endif
 };
 
 std::unique_ptr<AIProvider> createAnthropicProvider(const String& apiKey, const String& model);

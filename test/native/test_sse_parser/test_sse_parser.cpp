@@ -2,6 +2,7 @@
 
 #include <unity.h>
 #include "http/SSEParser.h"
+#include <vector>
 
 using namespace ESPAI;
 
@@ -367,6 +368,184 @@ void test_timeout_configuration() {
     TEST_ASSERT_EQUAL(5000, parser->getTimeout());
 }
 
+#if ESPAI_ENABLE_TOOLS
+
+static std::vector<ToolCall> toolCallResults;
+
+void resetToolCallResults() {
+    toolCallResults.clear();
+}
+
+void toolCallCallback(const String& id, const String& name, const String& arguments) {
+    toolCallResults.push_back(ToolCall(id, name, arguments));
+}
+
+void test_openai_stream_single_tool_call() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::OpenAI);
+    parser->setToolCallCallback(toolCallCallback);
+
+    // First chunk: role + tool_calls with id and name
+    parser->feed("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call_abc123\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]}}]}\n\n");
+
+    // Argument fragments
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"lo\"}}]}}]}\n\n");
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"cation\\\"\"}}]}}]}\n\n");
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\": \\\"Tokyo\\\"}\"}}]}}]}\n\n");
+
+    // [DONE] triggers finalization
+    parser->feed("data: [DONE]\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("call_abc123", toolCallResults[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"location\": \"Tokyo\"}", toolCallResults[0].arguments.c_str());
+}
+
+void test_openai_stream_multiple_tool_calls() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::OpenAI);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]}}]}\n\n");
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"location\\\":\\\"Tokyo\\\"}\"}}]}}]}\n\n");
+
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1,\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"get_time\",\"arguments\":\"\"}}]}}]}\n\n");
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1,\"function\":{\"arguments\":\"{\\\"timezone\\\":\\\"JST\\\"}\"}}]}}]}\n\n");
+
+    parser->feed("data: [DONE]\n\n");
+
+    TEST_ASSERT_EQUAL(2, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("call_1", toolCallResults[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"location\":\"Tokyo\"}", toolCallResults[0].arguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("call_2", toolCallResults[1].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_time", toolCallResults[1].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"timezone\":\"JST\"}", toolCallResults[1].arguments.c_str());
+}
+
+void test_openai_stream_tool_calls_available_via_getter() {
+    parser->setFormat(SSEFormat::OpenAI);
+
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_x\",\"type\":\"function\",\"function\":{\"name\":\"func1\",\"arguments\":\"{}\"}}]}}]}\n\n");
+    parser->feed("data: [DONE]\n\n");
+
+    const auto& calls = parser->getToolCalls();
+    TEST_ASSERT_EQUAL(1, calls.size());
+    TEST_ASSERT_EQUAL_STRING("call_x", calls[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("func1", calls[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{}", calls[0].arguments.c_str());
+}
+
+void test_anthropic_stream_single_tool_call() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Anthropic);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("event: message_start\ndata: {\"type\":\"message_start\"}\n\n");
+
+    // Tool use content block
+    parser->feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_abc123\",\"name\":\"get_weather\",\"input\":{}}}\n\n");
+
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\"\"}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\": \\\"San\"}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" Francisco, CA\\\"\"}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"}\"}}\n\n");
+
+    // content_block_stop triggers callback for Anthropic
+    parser->feed("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("toolu_abc123", toolCallResults[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"location\": \"San Francisco, CA\"}", toolCallResults[0].arguments.c_str());
+}
+
+void test_anthropic_stream_multiple_tool_calls() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Anthropic);
+    parser->setToolCallCallback(toolCallCallback);
+
+    parser->feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"get_weather\",\"input\":{}}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\\\"Tokyo\\\"}\"}}\n\n");
+    parser->feed("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+
+    parser->feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_2\",\"name\":\"get_time\",\"input\":{}}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"timezone\\\":\\\"JST\\\"}\"}}\n\n");
+    parser->feed("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n");
+
+    parser->feed("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
+
+    TEST_ASSERT_EQUAL(2, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("toolu_1", toolCallResults[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("toolu_2", toolCallResults[1].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_time", toolCallResults[1].name.c_str());
+}
+
+void test_openai_stream_mixed_text_and_tool_calls() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::OpenAI);
+    parser->setToolCallCallback(toolCallCallback);
+
+    // Text content first
+    parser->feed("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"Let me check\"}}]}\n\n");
+    parser->feed("data: {\"choices\":[{\"delta\":{\"content\":\" the weather.\"}}]}\n\n");
+
+    TEST_ASSERT_EQUAL(2, callbackCount);
+
+    // Then tool call
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_mix\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"location\\\":\\\"Paris\\\"}\"}}]}}]}\n\n");
+    parser->feed("data: [DONE]\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"location\":\"Paris\"}", toolCallResults[0].arguments.c_str());
+}
+
+void test_anthropic_stream_mixed_text_and_tool_call() {
+    resetToolCallResults();
+    parser->setFormat(SSEFormat::Anthropic);
+    parser->setToolCallCallback(toolCallCallback);
+
+    // Text block first
+    parser->feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Let me check.\"}}\n\n");
+    parser->feed("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n");
+
+    TEST_ASSERT_EQUAL_STRING("Let me check.", parser->getAccumulatedContent().c_str());
+    TEST_ASSERT_EQUAL(0, toolCallResults.size());
+
+    // Tool use block
+    parser->feed("event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_mix\",\"name\":\"get_weather\",\"input\":{}}}\n\n");
+    parser->feed("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\\\"Paris\\\"}\"}}\n\n");
+    parser->feed("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n");
+
+    parser->feed("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
+
+    TEST_ASSERT_EQUAL(1, toolCallResults.size());
+    TEST_ASSERT_EQUAL_STRING("toolu_mix", toolCallResults[0].id.c_str());
+    TEST_ASSERT_EQUAL_STRING("get_weather", toolCallResults[0].name.c_str());
+    TEST_ASSERT_EQUAL_STRING("{\"location\":\"Paris\"}", toolCallResults[0].arguments.c_str());
+}
+
+void test_tool_calls_cleared_on_reset() {
+    parser->setFormat(SSEFormat::OpenAI);
+
+    parser->feed("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_r\",\"type\":\"function\",\"function\":{\"name\":\"func\",\"arguments\":\"{}\"}}]}}]}\n\n");
+    parser->feed("data: [DONE]\n\n");
+
+    TEST_ASSERT_EQUAL(1, parser->getToolCalls().size());
+
+    parser->reset();
+    TEST_ASSERT_EQUAL(0, parser->getToolCalls().size());
+}
+
+#endif // ESPAI_ENABLE_TOOLS
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -433,6 +612,22 @@ int main(int argc, char** argv) {
 
     // Timeout
     RUN_TEST(test_timeout_configuration);
+
+#if ESPAI_ENABLE_TOOLS
+    // Streaming tool calls - OpenAI
+    RUN_TEST(test_openai_stream_single_tool_call);
+    RUN_TEST(test_openai_stream_multiple_tool_calls);
+    RUN_TEST(test_openai_stream_tool_calls_available_via_getter);
+    RUN_TEST(test_openai_stream_mixed_text_and_tool_calls);
+
+    // Streaming tool calls - Anthropic
+    RUN_TEST(test_anthropic_stream_single_tool_call);
+    RUN_TEST(test_anthropic_stream_multiple_tool_calls);
+    RUN_TEST(test_anthropic_stream_mixed_text_and_tool_call);
+
+    // Tool call reset
+    RUN_TEST(test_tool_calls_cleared_on_reset);
+#endif
 
     return UNITY_END();
 }

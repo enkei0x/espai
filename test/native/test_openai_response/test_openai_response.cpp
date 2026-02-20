@@ -2,13 +2,14 @@
 
 #include <unity.h>
 #include "providers/OpenAIProvider.h"
+#include "http/SSEParser.h"
 
 using namespace ESPAI;
 
 static OpenAIProvider* provider = nullptr;
 
 void setUp() {
-    provider = new OpenAIProvider("test-api-key", "gpt-4o-mini");
+    provider = new OpenAIProvider("test-api-key", "gpt-4.1-mini");
 }
 
 void tearDown() {
@@ -289,88 +290,110 @@ void test_parse_response_no_tool_calls() {
 
 #if ESPAI_ENABLE_STREAMING
 void test_parse_stream_chunk_basic() {
-    String chunk = "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}";
+    TEST_ASSERT_EQUAL(SSEFormat::OpenAI, provider->getSSEFormat());
 
-    String content;
-    bool done = false;
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
+    bool isDone = false;
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) result += content;
+        if (done) isDone = true;
+    });
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(done);
-    TEST_ASSERT_EQUAL_STRING("Hello", content.c_str());
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n");
+
+    TEST_ASSERT_EQUAL_STRING("Hello", result.c_str());
+    TEST_ASSERT_FALSE(isDone);
 }
 
 void test_parse_stream_chunk_done() {
-    String chunk = "data: [DONE]";
+    SSEParser parser(SSEFormat::OpenAI);
+    bool isDone = false;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)content;
+        if (done) isDone = true;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data: [DONE]\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(done);
+    TEST_ASSERT_TRUE(isDone);
 }
 
 void test_parse_stream_chunk_with_newline() {
-    String chunk = "data: {\"choices\":[{\"delta\":{\"content\":\"Line1\\nLine2\"}}]}";
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"Line1\\nLine2\"}}]}\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_EQUAL_STRING("Line1\nLine2", content.c_str());
+    TEST_ASSERT_EQUAL_STRING("Line1\nLine2", result.c_str());
 }
 
 void test_parse_stream_chunk_empty_delta() {
-    String chunk = "data: {\"choices\":[{\"delta\":{}}]}";
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data: {\"choices\":[{\"delta\":{}}]}\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(content.isEmpty());
+    TEST_ASSERT_TRUE(result.isEmpty());
 }
 
 void test_parse_stream_chunk_role_only() {
-    String chunk = "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}";
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(content.isEmpty());
-}
-
-void test_parse_stream_chunk_without_data_prefix() {
-    String chunk = "{\"choices\":[{\"delta\":{\"content\":\"Test\"}}]}";
-
-    String content;
-    bool done = false;
-
-    bool result = provider->parseStreamChunk(chunk, content, done);
-
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_EQUAL_STRING("Test", content.c_str());
+    TEST_ASSERT_TRUE(result.isEmpty());
 }
 
 void test_parse_stream_chunk_multiple_spaces_after_data() {
-    String chunk = "data:   {\"choices\":[{\"delta\":{\"content\":\"Spaced\"}}]}";
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
 
-    String content;
-    bool done = false;
+    parser.setContentCallback([&](const String& content, bool done) {
+        (void)done;
+        if (!content.isEmpty()) result += content;
+    });
 
-    bool result = provider->parseStreamChunk(chunk, content, done);
+    parser.feed("data:   {\"choices\":[{\"delta\":{\"content\":\"Spaced\"}}]}\n");
 
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_EQUAL_STRING("Spaced", content.c_str());
+    TEST_ASSERT_EQUAL_STRING("Spaced", result.c_str());
+}
+
+void test_parse_stream_multiple_chunks() {
+    SSEParser parser(SSEFormat::OpenAI);
+    String result;
+    bool isDone = false;
+
+    parser.setContentCallback([&](const String& content, bool done) {
+        if (!content.isEmpty()) result += content;
+        if (done) isDone = true;
+    });
+
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n");
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\" there\"}}]}\n");
+    parser.feed("data: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n");
+    parser.feed("data: [DONE]\n");
+
+    TEST_ASSERT_EQUAL_STRING("Hello there!", result.c_str());
+    TEST_ASSERT_TRUE(isDone);
 }
 #endif
 
@@ -405,8 +428,8 @@ int main(int argc, char** argv) {
     RUN_TEST(test_parse_stream_chunk_with_newline);
     RUN_TEST(test_parse_stream_chunk_empty_delta);
     RUN_TEST(test_parse_stream_chunk_role_only);
-    RUN_TEST(test_parse_stream_chunk_without_data_prefix);
     RUN_TEST(test_parse_stream_chunk_multiple_spaces_after_data);
+    RUN_TEST(test_parse_stream_multiple_chunks);
 #endif
 
     return UNITY_END();

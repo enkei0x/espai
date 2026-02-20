@@ -9,32 +9,17 @@ public:
     MockProvider(const String& apiKey, const String& model) {
         _apiKey = apiKey;
         _model = model;
+        _baseUrl = "https://api.openai.com/v1/chat/completions";
     }
-
-    ESPAI::Response chat(
-        const std::vector<ESPAI::Message>& messages,
-        const ESPAI::ChatOptions& options
-    ) override {
-        (void)messages;
-        (void)options;
-        return ESPAI::Response::ok("mock response");
-    }
-
-#if ESPAI_ENABLE_STREAMING
-    bool chatStream(
-        const std::vector<ESPAI::Message>& messages,
-        const ESPAI::ChatOptions& options,
-        ESPAI::StreamCallback callback
-    ) override {
-        (void)messages;
-        (void)options;
-        (void)callback;
-        return true;
-    }
-#endif
 
     const char* getName() const override { return "MockProvider"; }
     ESPAI::Provider getType() const override { return ESPAI::Provider::OpenAI; }
+
+#if ESPAI_ENABLE_TOOLS
+    ESPAI::Message getAssistantMessageWithToolCalls(const String& content = "") const override {
+        return ESPAI::Message(ESPAI::Role::Assistant, content);
+    }
+#endif
 
 protected:
     String buildRequestBody(
@@ -50,6 +35,10 @@ protected:
         (void)json;
         return ESPAI::Response::ok("parsed");
     }
+
+#if ESPAI_ENABLE_STREAMING
+    ESPAI::SSEFormat getSSEFormat() const override { return ESPAI::SSEFormat::OpenAI; }
+#endif
 };
 
 std::unique_ptr<ESPAI::AIProvider> createMockProvider(const String& apiKey, const String& model) {

@@ -77,6 +77,10 @@ bool HttpTransportESP32::setupHttpClient(HTTPClient& http, const HttpRequest& re
     http.setConnectTimeout(request.timeout);
     http.setReuse(_reuseConnection);
     http.setFollowRedirects(_followRedirects);
+
+    const char* headersToCollect[] = {"Retry-After"};
+    http.collectHeaders(headersToCollect, 1);
+
     addHeaders(http, request);
 
     return true;
@@ -165,6 +169,13 @@ HttpResponse HttpTransportESP32::execute(const HttpRequest& request) {
     if (httpCode > 0) {
         response.body = http.getString();
         response.success = (httpCode >= 200 && httpCode < 300);
+
+        if (httpCode == 429 || httpCode >= 500) {
+            String retryAfter = http.header("Retry-After");
+            if (retryAfter.length() > 0) {
+                response.retryAfterSeconds = atoi(retryAfter.c_str());
+            }
+        }
 
         ESPAI_LOG_D("HTTP", "Response code: %d, body length: %d", httpCode, response.body.length());
 

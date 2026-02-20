@@ -14,6 +14,9 @@ namespace ESPAI {
 
 SSEParser::SSEParser()
     : _format(SSEFormat::OpenAI)
+#if ESPAI_ENABLE_TOOLS
+    , _currentToolCallIndex(-1)
+#endif
     , _timeoutMs(ESPAI_HTTP_TIMEOUT_MS)
     , _lastActivityMs(0)
     , _errorCode(ErrorCode::None)
@@ -26,6 +29,9 @@ SSEParser::SSEParser()
 
 SSEParser::SSEParser(SSEFormat format)
     : _format(format)
+#if ESPAI_ENABLE_TOOLS
+    , _currentToolCallIndex(-1)
+#endif
     , _timeoutMs(ESPAI_HTTP_TIMEOUT_MS)
     , _lastActivityMs(0)
     , _errorCode(ErrorCode::None)
@@ -42,9 +48,11 @@ void SSEParser::feed(const char* data, size_t len) {
     }
 
     updateActivity();
-    for (size_t i = 0; i < len; ++i) {
-        _buffer += data[i];
-    }
+#ifdef ARDUINO
+    _buffer.concat(data, len);
+#else
+    _buffer.append(data, len);
+#endif
     processBuffer();
 }
 
@@ -61,6 +69,10 @@ void SSEParser::reset() {
     _done = false;
     _cancelled = false;
     _hasError = false;
+#if ESPAI_ENABLE_TOOLS
+    _pendingToolCalls.clear();
+    _currentToolCallIndex = -1;
+#endif
     updateActivity();
 }
 
@@ -159,6 +171,9 @@ bool SSEParser::parseOpenAIChunk(const String& data, String& content, bool& done
     done = false;
 
     if (data.indexOf("[DONE]") != -1) {
+#if ESPAI_ENABLE_TOOLS
+        finalizeToolCalls();
+#endif
         done = true;
         return true;
     }
@@ -188,6 +203,37 @@ bool SSEParser::parseOpenAIChunk(const String& data, String& content, bool& done
         content = delta["content"].as<String>();
     }
 
+#if ESPAI_ENABLE_TOOLS
+    if (!delta["tool_calls"].isNull()) {
+        JsonArray toolCalls = delta["tool_calls"];
+        for (JsonObject tc : toolCalls) {
+            int index = tc["index"] | 0;
+            if (index < 0 || index >= ESPAI_MAX_TOOLS) {
+                continue;
+            }
+
+            while (static_cast<int>(_pendingToolCalls.size()) <= index) {
+                _pendingToolCalls.push_back(PendingToolCall());
+            }
+
+            PendingToolCall& pending = _pendingToolCalls[index];
+
+            if (!tc["id"].isNull()) {
+                pending.id = tc["id"].as<String>();
+            }
+            if (!tc["function"].isNull()) {
+                JsonObject func = tc["function"];
+                if (!func["name"].isNull()) {
+                    pending.name = func["name"].as<String>();
+                }
+                if (!func["arguments"].isNull()) {
+                    pending.arguments += func["arguments"].as<String>();
+                }
+            }
+        }
+    }
+#endif
+
     return true;
 }
 
@@ -203,7 +249,7 @@ bool SSEParser::parseAnthropicChunk(const String& data, String& content, bool& d
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, data);
     if (error) {
-        if (_currentEventType == "message_stop" || _currentEventType == "message_start" ||
+        if (_currentEventType == "message_start" ||
             _currentEventType == "content_block_start" || _currentEventType == "content_block_stop" ||
             _currentEventType == "ping") {
             return true;
@@ -218,6 +264,24 @@ bool SSEParser::parseAnthropicChunk(const String& data, String& content, bool& d
         return true;
     }
 
+#if ESPAI_ENABLE_TOOLS
+    if (strcmp(type, "content_block_start") == 0) {
+        JsonObject block = doc["content_block"];
+        const char* blockType = block["type"] | "";
+        if (strcmp(blockType, "tool_use") == 0) {
+            if (static_cast<int>(_pendingToolCalls.size()) >= ESPAI_MAX_TOOLS) {
+                return true;
+            }
+            PendingToolCall tc;
+            tc.id = block["id"].as<String>();
+            tc.name = block["name"].as<String>();
+            _pendingToolCalls.push_back(tc);
+            _currentToolCallIndex = static_cast<int16_t>(_pendingToolCalls.size() - 1);
+        }
+        return true;
+    }
+#endif
+
     if (strcmp(type, "content_block_delta") == 0) {
         JsonObject delta = doc["delta"];
         const char* deltaType = delta["type"] | "";
@@ -225,10 +289,44 @@ bool SSEParser::parseAnthropicChunk(const String& data, String& content, bool& d
         if (strcmp(deltaType, "text_delta") == 0) {
             content = delta["text"].as<String>();
         }
+#if ESPAI_ENABLE_TOOLS
+        else if (strcmp(deltaType, "input_json_delta") == 0) {
+            if (_currentToolCallIndex >= 0 &&
+                _currentToolCallIndex < static_cast<int16_t>(_pendingToolCalls.size())) {
+                _pendingToolCalls[_currentToolCallIndex].arguments +=
+                    delta["partial_json"].as<String>();
+            }
+        }
+#endif
     }
+
+#if ESPAI_ENABLE_TOOLS
+    if (strcmp(type, "content_block_stop") == 0) {
+        if (_currentToolCallIndex >= 0 &&
+            _currentToolCallIndex < static_cast<int16_t>(_pendingToolCalls.size())) {
+            PendingToolCall& tc = _pendingToolCalls[_currentToolCallIndex];
+            if (!tc.name.isEmpty() && _toolCallCallback) {
+                _toolCallCallback(tc.id, tc.name, tc.arguments);
+            }
+            _currentToolCallIndex = -1;
+        }
+    }
+#endif
 
     return true;
 }
+
+#if ESPAI_ENABLE_TOOLS
+void SSEParser::finalizeToolCalls() {
+    if (_toolCallCallback) {
+        for (const auto& tc : _pendingToolCalls) {
+            if (!tc.name.isEmpty()) {
+                _toolCallCallback(tc.id, tc.name, tc.arguments);
+            }
+        }
+    }
+}
+#endif
 
 bool SSEParser::checkTimeout() {
     if (_timeoutMs == 0) {

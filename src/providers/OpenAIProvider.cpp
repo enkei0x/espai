@@ -1,10 +1,6 @@
 #include "OpenAIProvider.h"
 #include <ArduinoJson.h>
 
-#ifdef ARDUINO
-#include "../http/HttpTransportESP32.h"
-#endif
-
 #if ESPAI_PROVIDER_OPENAI
 
 namespace ESPAI {
@@ -46,12 +42,10 @@ String OpenAIProvider::buildRequestBody(
         if (msg.role == Role::Tool) {
             m["tool_call_id"] = msg.name.c_str();
         }
-        // For assistant messages with tool_calls, include the tool_calls array
         if (msg.role == Role::Assistant && msg.hasToolCalls()) {
             JsonDocument toolCallsDoc;
             deserializeJson(toolCallsDoc, msg.toolCallsJson);
             m["tool_calls"] = toolCallsDoc.as<JsonArray>();
-            // Content can be null when tool_calls are present
             if (msg.content.isEmpty()) {
                 m["content"] = nullptr;
             } else {
@@ -177,178 +171,11 @@ Response OpenAIProvider::parseResponse(const String& json) {
     return response;
 }
 
-Response OpenAIProvider::chat(
-    const std::vector<Message>& messages,
-    const ChatOptions& options
-) {
-    if (!isConfigured()) {
-        return Response::fail(ErrorCode::NotConfigured, "Provider not configured");
-    }
-
-#ifdef ARDUINO
-    HttpTransport* transport = getDefaultTransport();
-    if (transport == nullptr) {
-        return Response::fail(ErrorCode::NotConfigured, "HTTP transport not available");
-    }
-
-    if (!transport->isReady()) {
-        return Response::fail(ErrorCode::NetworkError, "Network not ready");
-    }
-
-    HttpRequest req = buildHttpRequest(messages, options);
-    ESPAI_LOG_D("OpenAI", "Sending chat request to %s", req.url.c_str());
-
-    HttpResponse httpResp = transport->execute(req);
-
-    if (!httpResp.success) {
-        return handleHttpError(httpResp.statusCode, httpResp.body);
-    }
-
-    Response response = parseResponse(httpResp.body);
-    response.httpStatus = httpResp.statusCode;
-
-    return response;
-#else
-    (void)messages;
-    (void)options;
-    return Response::fail(ErrorCode::NotConfigured, "HTTP client not available in native build");
-#endif
-}
-
-#if ESPAI_ENABLE_STREAMING
-bool OpenAIProvider::chatStream(
-    const std::vector<Message>& messages,
-    const ChatOptions& options,
-    StreamCallback callback
-) {
-    if (!isConfigured()) {
-        return false;
-    }
-
-#ifdef ARDUINO
-    HttpTransport* transport = getDefaultTransport();
-    if (transport == nullptr || !transport->isReady()) {
-        return false;
-    }
-
-    HttpRequest req = buildHttpRequest(messages, options);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, req.body);
-    if (error) {
-        return false;
-    }
-    doc["stream"] = true;
-    req.body = "";
-    serializeJson(doc, req.body);
-
-    ESPAI_LOG_D("OpenAI", "Starting streaming chat to %s", req.url.c_str());
-
-    String lineBuffer;
-
-    bool success = transport->executeStream(req, [&](const uint8_t* data, size_t len) -> bool {
-        for (size_t i = 0; i < len; i++) {
-            char c = static_cast<char>(data[i]);
-            if (c == '\n') {
-                if (!lineBuffer.isEmpty()) {
-                    String content;
-                    bool done = false;
-
-                    if (parseStreamChunk(lineBuffer, content, done)) {
-                        if (!content.isEmpty()) {
-                            callback(content, false);
-                        }
-                        if (done) {
-                            callback("", true);
-                            lineBuffer = "";
-                            return false;
-                        }
-                    }
-                    lineBuffer = "";
-                }
-            } else if (c != '\r') {
-                lineBuffer += c;
-            }
-        }
-        return true;
-    });
-
-    return success;
-#else
-    (void)messages;
-    (void)options;
-    (void)callback;
-    return false;
-#endif
-}
-
-bool OpenAIProvider::parseStreamChunk(const String& chunk, String& content, bool& done) {
-    done = false;
-    content = "";
-
-    if (chunk.indexOf("[DONE]") != -1) {
-        done = true;
-        return true;
-    }
-
-    int dataPos = chunk.indexOf("data:");
-    String jsonStr;
-    if (dataPos == -1) {
-        jsonStr = chunk;
-    } else {
-        unsigned int jsonStart = dataPos + 5;
-        while (jsonStart < chunk.length() && chunk[jsonStart] == ' ') {
-            jsonStart++;
-        }
-        jsonStr = chunk.substring(jsonStart);
-    }
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonStr);
-    if (error) {
-        return false;
-    }
-
-    if (doc["choices"].isNull()) {
-        return false;
-    }
-
-    JsonArray choices = doc["choices"];
-    if (choices.size() == 0) {
-        return true;
-    }
-
-    JsonObject firstChoice = choices[0];
-    if (firstChoice["delta"].isNull()) {
-        return true;
-    }
-
-    JsonObject delta = firstChoice["delta"];
-    if (!delta["content"].isNull()) {
-        content = delta["content"].as<String>();
-    }
-
-    return true;
-}
-#endif
-
 #if ESPAI_ENABLE_TOOLS
-void OpenAIProvider::addTool(const Tool& tool) {
-    if (_tools.size() < ESPAI_MAX_TOOLS) {
-        _tools.push_back(tool);
-    }
-}
-
-void OpenAIProvider::clearTools() {
-    _tools.clear();
-    _lastToolCalls.clear();
-}
-
 Message OpenAIProvider::getAssistantMessageWithToolCalls(const String& content) const {
     Message msg(Role::Assistant, content);
 
     if (!_lastToolCalls.empty()) {
-        // Build tool_calls JSON array
         JsonDocument doc;
         JsonArray arr = doc.to<JsonArray>();
 

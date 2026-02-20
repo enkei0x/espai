@@ -8,7 +8,7 @@ using namespace ESPAI;
 static OpenAIProvider* provider = nullptr;
 
 void setUp() {
-    provider = new OpenAIProvider("test-api-key", "gpt-4o-mini");
+    provider = new OpenAIProvider("test-api-key", "gpt-4.1-mini");
 }
 
 void tearDown() {
@@ -26,7 +26,7 @@ void test_build_request_basic() {
 
     String body = provider->buildRequestBody(messages, options);
 
-    TEST_ASSERT_TRUE(body.find("\"model\":\"gpt-4o-mini\"") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("\"model\":\"gpt-4.1-mini\"") != std::string::npos);
     TEST_ASSERT_TRUE(body.find("\"messages\":[") != std::string::npos);
     TEST_ASSERT_TRUE(body.find("\"role\":\"user\"") != std::string::npos);
     TEST_ASSERT_TRUE(body.find("\"content\":\"Hello\"") != std::string::npos);
