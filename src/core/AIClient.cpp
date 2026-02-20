@@ -180,7 +180,7 @@ String AIClient::_getDefaultModel() const {
         case Provider::Anthropic: return ESPAI_DEFAULT_MODEL_ANTHROPIC;
         case Provider::Gemini:    return ESPAI_DEFAULT_MODEL_GEMINI;
         case Provider::Ollama:    return ESPAI_DEFAULT_MODEL_OLLAMA;
-        case Provider::Custom:    return "gpt-3.5-turbo";
+        case Provider::Custom:    return "gpt-4.1-mini";
         default:                  return "";
     }
 }

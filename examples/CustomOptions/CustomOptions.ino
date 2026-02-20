@@ -161,12 +161,12 @@ void demonstrateModelOverride() {
     // Useful for using different models for different tasks
 
     ChatOptions withModel;
-    withModel.model = "gpt-4o-mini";  // Explicitly set model
+    withModel.model = "gpt-4.1-mini";  // Explicitly set model
     withModel.temperature = 0.7f;
     withModel.maxTokens = 50;
 
     sendRequest(
-        "MODEL OVERRIDE (gpt-4o-mini)",
+        "MODEL OVERRIDE (gpt-4.1-mini)",
         "What is 2 + 2? Reply with just the number.",
         withModel
     );

@@ -173,7 +173,7 @@ Provider for OpenAI GPT models.
 ### Constructor
 
 ```cpp
-OpenAIProvider(const String& apiKey, const String& model = "gpt-4o-mini");
+OpenAIProvider(const String& apiKey, const String& model = "gpt-4.1-mini");
 ```
 
 ### Methods

@@ -39,7 +39,7 @@
 #endif
 
 #ifndef ESPAI_DEFAULT_MODEL_OPENAI
-#define ESPAI_DEFAULT_MODEL_OPENAI      "gpt-4o-mini"
+#define ESPAI_DEFAULT_MODEL_OPENAI      "gpt-4.1-mini"
 #endif
 
 #ifndef ESPAI_DEFAULT_MODEL_ANTHROPIC

@@ -51,7 +51,7 @@ void test_heap_after_provider_creation() {
     uint32_t heapBefore = ESP.getFreeHeap();
 
     {
-        OpenAIProvider tempProvider(TEST_OPENAI_KEY, "gpt-4o-mini");
+        OpenAIProvider tempProvider(TEST_OPENAI_KEY, "gpt-4.1-mini");
     }
 
     uint32_t heapAfter = ESP.getFreeHeap();
@@ -177,7 +177,7 @@ void setup() {
 
     connectWiFi();
 
-    provider = new OpenAIProvider(TEST_OPENAI_KEY, "gpt-4o-mini");
+    provider = new OpenAIProvider(TEST_OPENAI_KEY, "gpt-4.1-mini");
     provider->setTimeout(30000);
 
     UNITY_BEGIN();

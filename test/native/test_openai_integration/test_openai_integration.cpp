@@ -122,7 +122,7 @@ void test_provider_timeout_setting() {
 void test_full_request_response_cycle() {
     ProviderFactory::registerProvider(Provider::OpenAI, createOpenAIProvider);
 
-    auto provider = ProviderFactory::create(Provider::OpenAI, "test-key", "gpt-4o-mini");
+    auto provider = ProviderFactory::create(Provider::OpenAI, "test-key", "gpt-4.1-mini");
     auto* openaiProvider = static_cast<OpenAIProvider*>(provider.get());
 
     std::vector<Message> messages;
@@ -136,7 +136,7 @@ void test_full_request_response_cycle() {
     HttpRequest req = openaiProvider->buildHttpRequest(messages, options);
 
     TEST_ASSERT_EQUAL_STRING("POST", req.method.c_str());
-    TEST_ASSERT_TRUE(req.body.find("\"model\":\"gpt-4o-mini\"") != std::string::npos);
+    TEST_ASSERT_TRUE(req.body.find("\"model\":\"gpt-4.1-mini\"") != std::string::npos);
     TEST_ASSERT_TRUE(req.body.find("\"role\":\"system\"") != std::string::npos);
     TEST_ASSERT_TRUE(req.body.find("\"role\":\"user\"") != std::string::npos);
 
@@ -293,7 +293,7 @@ void test_error_handling_rate_limit() {
 void test_model_override_in_options() {
     ProviderFactory::registerProvider(Provider::OpenAI, createOpenAIProvider);
 
-    auto provider = ProviderFactory::create(Provider::OpenAI, "test-key", "gpt-4o-mini");
+    auto provider = ProviderFactory::create(Provider::OpenAI, "test-key", "gpt-4.1-mini");
     auto* openaiProvider = static_cast<OpenAIProvider*>(provider.get());
 
     std::vector<Message> messages;
@@ -305,7 +305,7 @@ void test_model_override_in_options() {
     String body = openaiProvider->buildRequestBody(messages, options);
 
     TEST_ASSERT_TRUE(body.find("\"model\":\"gpt-4o\"") != std::string::npos);
-    TEST_ASSERT_TRUE(body.find("gpt-4o-mini") == std::string::npos);
+    TEST_ASSERT_TRUE(body.find("gpt-4.1-mini") == std::string::npos);
 }
 
 void test_api_key_in_header() {

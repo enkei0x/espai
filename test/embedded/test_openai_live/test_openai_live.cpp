@@ -254,7 +254,7 @@ void test_model_override() {
 
     ChatOptions options;
     options.maxTokens = 5;
-    options.model = "gpt-4o-mini";
+    options.model = "gpt-4.1-mini";
 
     Response resp = provider->chat(messages, options);
 
@@ -302,7 +302,7 @@ void setup() {
 
     connectWiFi();
 
-    provider = new OpenAIProvider(TEST_OPENAI_KEY, "gpt-4o-mini");
+    provider = new OpenAIProvider(TEST_OPENAI_KEY, "gpt-4.1-mini");
     provider->setTimeout(30000);
 
     UNITY_BEGIN();

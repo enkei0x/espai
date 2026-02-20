@@ -9,7 +9,7 @@ using namespace ESPAI;
 static OpenAIProvider* provider = nullptr;
 
 void setUp() {
-    provider = new OpenAIProvider("test-api-key", "gpt-4o-mini");
+    provider = new OpenAIProvider("test-api-key", "gpt-4.1-mini");
 }
 
 void tearDown() {

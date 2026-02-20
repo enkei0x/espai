@@ -181,7 +181,7 @@ options.maxTokens = 1024;        // Max response length
 options.topP = 0.9;              // Nucleus sampling
 options.frequencyPenalty = 0.0;  // Reduce repetition
 options.presencePenalty = 0.0;   // Encourage new topics
-options.model = "gpt-4o-mini";   // Model override
+options.model = "gpt-4.1-mini";   // Model override
 options.systemPrompt = "...";    // System instructions
 ```
 
