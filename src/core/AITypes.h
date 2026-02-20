@@ -203,6 +203,21 @@ struct ChatOptions {
         , presencePenalty(0.0f) {}
 };
 
+struct RetryConfig {
+    bool enabled;
+    uint8_t maxRetries;
+    uint32_t initialDelayMs;
+    float backoffMultiplier;
+    uint32_t maxDelayMs;
+
+    RetryConfig()
+        : enabled(false)
+        , maxRetries(3)
+        , initialDelayMs(1000)
+        , backoffMultiplier(2.0f)
+        , maxDelayMs(30000) {}
+};
+
 #if ESPAI_ENABLE_STREAMING
 using StreamCallback = std::function<void(const String& chunk, bool done)>;
 #endif

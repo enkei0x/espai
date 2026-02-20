@@ -1,10 +1,28 @@
 #include "AIProvider.h"
+#include <cmath>
 
 #ifdef ARDUINO
 #include "../http/HttpTransportESP32.h"
 #endif
 
 namespace ESPAI {
+
+bool AIProvider::isRetryableStatus(int16_t statusCode) {
+    return statusCode == 429 || (statusCode >= 500 && statusCode < 600);
+}
+
+uint32_t AIProvider::calculateRetryDelay(const RetryConfig& config, uint8_t attempt, int32_t retryAfterSeconds) {
+    if (retryAfterSeconds > 0) {
+        uint32_t retryAfterMs = static_cast<uint32_t>(retryAfterSeconds) * 1000;
+        return (retryAfterMs < config.maxDelayMs) ? retryAfterMs : config.maxDelayMs;
+    }
+
+    float delay = static_cast<float>(config.initialDelayMs) * powf(config.backoffMultiplier, static_cast<float>(attempt));
+    if (delay >= static_cast<float>(config.maxDelayMs)) {
+        return config.maxDelayMs;
+    }
+    return static_cast<uint32_t>(delay);
+}
 
 Response AIProvider::chat(
     const std::vector<Message>& messages,
@@ -27,7 +45,30 @@ Response AIProvider::chat(
     HttpRequest req = buildHttpRequest(messages, options);
     ESPAI_LOG_D(getName(), "Sending chat request to %s", req.url.c_str());
 
-    HttpResponse httpResp = transport->execute(req);
+    uint16_t maxAttempts = (_retryConfig.enabled) ? static_cast<uint16_t>(_retryConfig.maxRetries) + 1 : 1;
+    HttpResponse httpResp;
+
+    for (uint16_t attempt = 0; attempt < maxAttempts; attempt++) {
+        httpResp = transport->execute(req);
+
+        if (httpResp.success) {
+            break;
+        }
+
+        bool lastAttempt = (attempt + 1 >= maxAttempts);
+        if (!_retryConfig.enabled || lastAttempt || !isRetryableStatus(httpResp.statusCode)) {
+            break;
+        }
+
+        uint32_t delayMs = calculateRetryDelay(_retryConfig, attempt, httpResp.retryAfterSeconds);
+        ESPAI_LOG_W(getName(), "Retry %d/%d after %lums (HTTP %d)",
+                    attempt + 1, _retryConfig.maxRetries, (unsigned long)delayMs, httpResp.statusCode);
+        delay(delayMs);
+
+        if (!transport->isReady()) {
+            return Response::fail(ErrorCode::NetworkError, "Network lost during retry");
+        }
+    }
 
     if (!httpResp.success) {
         return handleHttpError(httpResp.statusCode, httpResp.body);
@@ -73,19 +114,44 @@ bool AIProvider::chatStream(
 
     ESPAI_LOG_D(getName(), "Starting streaming chat to %s", req.url.c_str());
 
-    SSEParser parser(getSSEFormat());
-    parser.setTimeout(_timeout);
-    parser.setAccumulateContent(false);
-    parser.setContentCallback([&callback](const String& content, bool done) {
-        callback(content, done);
-    });
+    // Note: If a streaming attempt fails after partial data has been sent to
+    // the callback, a retry will deliver a new complete response. The caller
+    // must handle this (e.g., by resetting any accumulated state).
+    uint16_t maxAttempts = (_retryConfig.enabled) ? static_cast<uint16_t>(_retryConfig.maxRetries) + 1 : 1;
 
-    bool success = transport->executeStream(req, [&parser](const uint8_t* data, size_t len) -> bool {
-        parser.feed(reinterpret_cast<const char*>(data), len);
-        return !parser.isDone() && !parser.hasError();
-    });
+    for (uint16_t attempt = 0; attempt < maxAttempts; attempt++) {
+        SSEParser parser(getSSEFormat());
+        parser.setTimeout(_timeout);
+        parser.setAccumulateContent(false);
+        parser.setContentCallback([&callback](const String& content, bool done) {
+            callback(content, done);
+        });
 
-    return success && !parser.hasError();
+        bool success = transport->executeStream(req, [&parser](const uint8_t* data, size_t len) -> bool {
+            parser.feed(reinterpret_cast<const char*>(data), len);
+            return !parser.isDone() && !parser.hasError();
+        });
+
+        if (success && !parser.hasError()) {
+            return true;
+        }
+
+        bool lastAttempt = (attempt + 1 >= maxAttempts);
+        if (!_retryConfig.enabled || lastAttempt) {
+            break;
+        }
+
+        uint32_t delayMs = calculateRetryDelay(_retryConfig, attempt, -1);
+        ESPAI_LOG_W(getName(), "Stream retry %d/%d after %lums",
+                    attempt + 1, _retryConfig.maxRetries, (unsigned long)delayMs);
+        delay(delayMs);
+
+        if (!transport->isReady()) {
+            return false;
+        }
+    }
+
+    return false;
 #else
     (void)messages;
     (void)options;

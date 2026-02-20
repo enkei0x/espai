@@ -83,7 +83,8 @@ void test_basic_chat_request() {
     Serial.printf("[INFO] Content: %s\n", resp.content.c_str());
     Serial.printf("[INFO] Tokens: prompt=%u, completion=%u\n", resp.promptTokens, resp.completionTokens);
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage + " content=" + resp.content.substring(0, 100);
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     TEST_ASSERT_EQUAL(200, resp.httpStatus);
     TEST_ASSERT_FALSE(resp.content.isEmpty());
     TEST_ASSERT_TRUE(resp.content.indexOf("4") >= 0);
@@ -103,7 +104,8 @@ void test_chat_with_system_prompt() {
 
     Serial.printf("[INFO] Content: %s\n", resp.content.c_str());
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     TEST_ASSERT_FALSE(resp.content.isEmpty());
 }
 
@@ -118,7 +120,8 @@ void test_content_array_parsing() {
 
     Serial.printf("[INFO] Content array test: %s\n", resp.content.c_str());
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     TEST_ASSERT_FALSE(resp.content.isEmpty());
     TEST_ASSERT_EQUAL(ErrorCode::None, resp.error);
 }
@@ -149,7 +152,7 @@ void test_streaming_response() {
     Serial.printf("[INFO] Streaming: success=%d, chunks=%d, completed=%d\n", success, chunkCount, completed);
     Serial.printf("[INFO] Accumulated: %s\n", accumulated.c_str());
 
-    TEST_ASSERT_TRUE(success);
+    TEST_ASSERT_TRUE_MESSAGE(success, "Stream returned false");
     TEST_ASSERT_TRUE(completed);
     TEST_ASSERT_GREATER_THAN(0, chunkCount);
     TEST_ASSERT_FALSE(accumulated.isEmpty());
@@ -176,7 +179,8 @@ void test_tool_calling() {
     Serial.printf("[INFO] Tool call response: success=%d\n", resp.success);
     Serial.printf("[INFO] Has tool calls: %d\n", provider->hasToolCalls());
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg3 = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg3.c_str());
 
     if (provider->hasToolCalls()) {
         const auto& calls = provider->getLastToolCalls();
@@ -214,7 +218,8 @@ void test_multi_turn_conversation() {
 
     Serial.printf("[INFO] Multi-turn: %s\n", resp.content.c_str());
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     TEST_ASSERT_TRUE(resp.content.indexOf("Alice") >= 0);
 }
 
@@ -224,12 +229,13 @@ void test_model_override() {
 
     ChatOptions options;
     options.maxTokens = 5;
-    options.model = "claude-3-5-haiku-latest";
+    options.model = "claude-haiku-4-5-20251001";
 
     Response resp = provider->chat(messages, options);
 
     Serial.printf("[INFO] Model override: success=%d\n", resp.success);
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
 }
 
 void test_api_version_header() {
@@ -248,7 +254,8 @@ void test_max_tokens_respected() {
 
     Serial.printf("[INFO] Max tokens: completion=%u\n", resp.completionTokens);
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     TEST_ASSERT_LESS_OR_EQUAL(20, resp.completionTokens);
 }
 
@@ -262,7 +269,8 @@ void test_temperature_setting() {
 
     Response resp = provider->chat(messages, options);
 
-    TEST_ASSERT_TRUE(resp.success);
+    String debugMsg = "HTTP=" + String(resp.httpStatus) + " err=" + resp.errorMessage;
+    TEST_ASSERT_TRUE_MESSAGE(resp.success, debugMsg.c_str());
     Serial.printf("[INFO] Random response: %s\n", resp.content.c_str());
 }
 
@@ -275,7 +283,7 @@ void setup() {
 
     connectWiFi();
 
-    provider = new AnthropicProvider(TEST_ANTHROPIC_KEY, "claude-3-5-haiku-latest");
+    provider = new AnthropicProvider(TEST_ANTHROPIC_KEY, "claude-haiku-4-5-20251001");
     provider->setTimeout(30000);
 
     UNITY_BEGIN();

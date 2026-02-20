@@ -27,8 +27,9 @@ struct HttpResponse {
     int16_t statusCode;
     String body;
     bool success;
+    int32_t retryAfterSeconds;
 
-    HttpResponse() : statusCode(0), success(false) {}
+    HttpResponse() : statusCode(0), success(false), retryAfterSeconds(-1) {}
 };
 
 class AIProvider {
@@ -62,6 +63,8 @@ public:
     virtual void setModel(const String& model) { _model = model; }
     virtual void setBaseUrl(const String& url) { _baseUrl = url; }
     virtual void setTimeout(uint32_t timeoutMs) { _timeout = timeoutMs; }
+    void setRetryConfig(const RetryConfig& config) { _retryConfig = config; }
+    const RetryConfig& getRetryConfig() const { return _retryConfig; }
 
     const String& getApiKey() const { return _apiKey; }
     const String& getModel() const { return _model; }
@@ -85,6 +88,10 @@ protected:
     String _model;
     String _baseUrl;
     uint32_t _timeout = ESPAI_HTTP_TIMEOUT_MS;
+    RetryConfig _retryConfig;
+
+    static bool isRetryableStatus(int16_t statusCode);
+    static uint32_t calculateRetryDelay(const RetryConfig& config, uint8_t attempt, int32_t retryAfterSeconds);
 
 #if ESPAI_ENABLE_TOOLS
     std::vector<Tool> _tools;
