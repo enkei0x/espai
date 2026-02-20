@@ -11,7 +11,7 @@
   <a href="https://www.arduino.cc/"><img src="https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino" alt="Arduino"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.espressif.com/"><img src="https://img.shields.io/badge/ESP32-Supported-green?logo=espressif" alt="ESP32"></a>
-  <img src="https://img.shields.io/badge/Tests-287%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-353%20passed-brightgreen" alt="Tests">
 </p>
 
 > 🚀 Bring the power of GPT and Claude to your ESP32 projects!
@@ -40,7 +40,7 @@ Add to your `platformio.ini`:
 
 ```ini
 lib_deps =
-    enkei0x/ESPAI@^0.6.1
+    enkei0x/ESPAI@^0.7.0
 ```
 
 ### Arduino IDE
