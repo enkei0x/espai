@@ -8,8 +8,9 @@ ESPAI supports multiple AI providers. This guide covers the differences and how 
 |----------|--------|--------|
 | OpenAI | ✅ Supported | All text models |
 | Anthropic | ✅ Supported | All text models |
-| Gemini | 🔜 Planned | - |
-| Ollama | 🔜 Planned | - |
+| Gemini | ✅ Supported | All text models |
+| Ollama | ✅ Supported | Any local model |
+| OpenAI-compatible | ✅ Supported | Groq, DeepSeek, Together AI, LM Studio, OpenRouter, etc. |
 
 ---
 
@@ -85,6 +86,87 @@ Uses `x-api-key: <key>` header (different from OpenAI).
 
 ---
 
+## 🟠 Ollama (Local LLMs)
+
+### Setup
+
+No API key needed — just a running Ollama instance on your network.
+
+```cpp
+#include <ESPAI.h>
+using namespace ESPAI;
+
+OllamaProvider ai;  // Connects to localhost:11434
+```
+
+### Default Model
+
+`llama3.2`
+
+### Change Model
+
+```cpp
+ai.setModel("mistral");
+ai.setModel("codellama");
+ai.setModel("gemma2");
+```
+
+### Custom Host
+
+For Ollama running on another machine:
+
+```cpp
+ai.setBaseUrl("http://192.168.1.100:11434/v1/chat/completions");
+```
+
+### Authentication
+
+None required by default. Uses the OpenAI-compatible `/v1/chat/completions` endpoint over plain HTTP.
+
+---
+
+## 🔵 OpenAI-Compatible (Custom Providers)
+
+For any provider that follows the OpenAI chat completions API format (Groq, DeepSeek, Together AI, LM Studio, OpenRouter, etc.).
+
+### Setup
+
+```cpp
+#include <ESPAI.h>
+using namespace ESPAI;
+
+OpenAICompatibleConfig config;
+config.name = "Groq";
+config.baseUrl = "https://api.groq.com/openai/v1/chat/completions";
+config.apiKey = "gsk-...";
+config.model = "llama-3.3-70b-versatile";
+
+OpenAICompatibleProvider ai(config);
+```
+
+### Configuration Options
+
+```cpp
+OpenAICompatibleConfig config;
+config.name = "MyProvider";
+config.baseUrl = "https://api.example.com/v1/chat/completions";
+config.apiKey = "your-key";
+config.model = "your-model";
+config.authHeaderName = "Authorization";      // default
+config.authHeaderValuePrefix = "Bearer ";     // default
+config.requiresApiKey = true;                 // set false for local providers
+config.toolCallingSupported = true;           // set false if provider doesn't support tools
+```
+
+### Custom Headers
+
+```cpp
+OpenAICompatibleProvider ai(config);
+ai.addCustomHeader("X-Custom-Header", "value");
+```
+
+---
+
 ## 🔄 Key Differences
 
 ### System Messages
@@ -113,7 +195,7 @@ opts.systemPrompt = "You are helpful.";
 
 ### Tool Calling
 
-Both providers use the same unified API:
+All providers use the same unified API:
 
 ```cpp
 Tool tool;
@@ -121,7 +203,7 @@ tool.name = "get_weather";
 tool.description = "Get weather";
 tool.parametersJson = R"({"type":"object","properties":{}})";
 
-ai.addTool(tool);  // Works for both OpenAI and Anthropic
+ai.addTool(tool);  // Works for OpenAI, Anthropic, Gemini, and Ollama
 
 if (ai.hasToolCalls()) {
     for (const auto& call : ai.getLastToolCalls()) {
@@ -162,17 +244,25 @@ Response resp = ai.chat(messages, options);
 // Anthropic - same interface!
 AnthropicProvider claude("sk-ant-...");
 Response resp = claude.chat(messages, options);
+
+// Ollama - same interface, no key needed!
+OllamaProvider ollama;
+Response resp = ollama.chat(messages, options);
 ```
 
-You can even use both in the same project:
+You can even use multiple providers in the same project:
 
 ```cpp
 OpenAIProvider gpt("sk-...");
 AnthropicProvider claude("sk-ant-...");
+OllamaProvider ollama;
 
 // Use GPT for quick tasks
 auto quick = gpt.chat(simpleMessages, opts);
 
 // Use Claude for complex reasoning
 auto detailed = claude.chat(complexMessages, opts);
+
+// Use Ollama for offline/local processing
+auto local = ollama.chat(simpleMessages, opts);
 ```

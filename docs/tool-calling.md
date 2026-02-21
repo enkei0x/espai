@@ -78,9 +78,10 @@ tool.description = "What it does";     // Required: helps AI decide when to use
 tool.parametersJson = "...";           // Required: JSON schema for parameters
 ```
 
-The same tool definition works for both OpenAI and Anthropic:
-- OpenAI maps `parametersJson` to the `parameters` field
+The same tool definition works for all providers:
+- OpenAI, Ollama, and OpenAI-compatible providers map `parametersJson` to the `parameters` field
 - Anthropic maps `parametersJson` to the `input_schema` field
+- Gemini maps `parametersJson` to the Gemini function declarations format
 
 ---
 
@@ -231,9 +232,9 @@ String executeMyTool(const String& name, const String& args) {
 
 ---
 
-## Unified API (OpenAI and Anthropic)
+## Unified API (All Providers)
 
-ESPAI provides a unified tool calling API that works identically for both OpenAI and Anthropic:
+ESPAI provides a unified tool calling API that works identically for OpenAI, Anthropic, Gemini, Ollama, and any OpenAI-compatible provider:
 
 | Aspect | All Providers |
 |--------|---------------|
@@ -248,7 +249,7 @@ ESPAI provides a unified tool calling API that works identically for both OpenAI
 This means you can write provider-agnostic code:
 
 ```cpp
-// Works with OpenAIProvider or AnthropicProvider
+// Works with any provider: OpenAI, Anthropic, Gemini, Ollama, or custom
 void processTool(AIProvider& provider) {
     if (provider.hasToolCalls()) {
         const auto& calls = provider.getLastToolCalls();

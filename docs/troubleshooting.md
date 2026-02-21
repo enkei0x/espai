@@ -39,6 +39,14 @@ Common issues and how to fix them.
    - Some networks block API endpoints
    - Try a different network
 
+5. **Ollama not reachable**
+   - Verify Ollama is running: `curl http://localhost:11434/v1/models`
+   - If Ollama runs on another machine, set the correct host:
+     ```cpp
+     ollama.setBaseUrl("http://192.168.1.100:11434/v1/chat/completions");
+     ```
+   - Ensure ESP32 and Ollama are on the same network
+
 ---
 
 ## SSL/TLS Certificate Issues
@@ -46,7 +54,7 @@ Common issues and how to fix them.
 ### "SSL handshake failed" / Certificate errors
 
 **Background:**
-ESPAI validates SSL certificates by default to protect your API keys from man-in-the-middle attacks. The library includes built-in root CA certificates that cover api.openai.com and api.anthropic.com.
+ESPAI validates SSL certificates by default to protect your API keys from man-in-the-middle attacks. The library includes built-in root CA certificates that cover api.openai.com, api.anthropic.com, and generativelanguage.googleapis.com. Local providers like Ollama use plain HTTP — no SSL involved.
 
 **Solutions:**
 
@@ -97,6 +105,8 @@ ESPAI validates SSL certificates by default to protect your API keys from man-in
 1. **Verify API key**
    - OpenAI: Starts with `sk-`
    - Anthropic: Starts with `sk-ant-`
+   - Gemini: Starts with `AIza`
+   - Ollama: No key needed (local)
 
 2. **Check for typos/whitespace**
    ```cpp

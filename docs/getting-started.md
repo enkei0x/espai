@@ -7,7 +7,7 @@ Welcome to ESPAI! This guide will help you get up and running in minutes.
 - ESP32 board (any variant: ESP32, ESP32-S3, ESP32-C3)
 - Arduino IDE or PlatformIO
 - WiFi network
-- API key from [OpenAI](https://platform.openai.com/api-keys) or [Anthropic](https://console.anthropic.com/)
+- API key from [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI Studio](https://aistudio.google.com/apikey) — or use [Ollama](https://ollama.com/) for local LLMs (no key needed)
 
 ## Installation
 
@@ -101,9 +101,11 @@ Then include it:
 To save ~10KB flash, disable unused providers before including ESPAI:
 
 ```cpp
-#define ESPAI_PROVIDER_ANTHROPIC 0  // Disable Anthropic (~10KB)
+#define ESPAI_PROVIDER_ANTHROPIC 0  // Disable Anthropic
+#define ESPAI_PROVIDER_GEMINI 0     // Disable Gemini
+#define ESPAI_PROVIDER_OLLAMA 0     // Disable Ollama
 // or
-#define ESPAI_PROVIDER_OPENAI 0     // Disable OpenAI (~10KB)
+#define ESPAI_PROVIDER_OPENAI 0     // Disable OpenAI
 
 #include <ESPAI.h>
 ```
@@ -111,6 +113,6 @@ To save ~10KB flash, disable unused providers before including ESPAI:
 ## 🎯 Next Steps
 
 - [API Reference](api-reference.md) - All classes and methods
-- [Providers Guide](providers.md) - OpenAI vs Anthropic
+- [Providers Guide](providers.md) - OpenAI, Anthropic, Gemini, Ollama and more
 - [Streaming](streaming.md) - Real-time responses
 - [Tool Calling](tool-calling.md) - Let AI call your functions
