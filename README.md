@@ -11,12 +11,12 @@
   <a href="https://www.arduino.cc/"><img src="https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino" alt="Arduino"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.espressif.com/"><img src="https://img.shields.io/badge/ESP32-Supported-green?logo=espressif" alt="ESP32"></a>
-  <img src="https://img.shields.io/badge/Tests-445%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-457%20passed-brightgreen" alt="Tests">
 </p>
 
 > 🚀 Bring the power of GPT, Claude, Gemini and local LLMs to your ESP32 projects!
 
-ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI, Anthropic, Google Gemini and Ollama APIs into your ESP32 projects. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
+ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI, Anthropic, Google Gemini and Ollama APIs into your ESP32 projects. Supports ESP32, ESP32-S2, ESP32-S3, and ESP32-C3. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
 
 ```cpp
 #include <ESPAI.h>
@@ -43,8 +43,9 @@ Serial.println(res.content);
 - 🔄 **Multiple Providers** — OpenAI, Anthropic (Claude), Google Gemini, Ollama and any OpenAI-compatible API through a single unified interface
 - 🏠 **Local LLMs** — Run models locally with Ollama, no API key or internet required
 - 📦 **Lightweight** — Minimal memory footprint, optimized for ESP32
-- ⚡ **Non-blocking** — Async-friendly design
-- 🧪 **Well Tested** — 445+ native unit tests, CI-ready
+- ⚡ **Async Support** — Non-blocking FreeRTOS-based async chat and streaming
+- 🔁 **Auto Retry** — Built-in retry with exponential backoff for rate limits and server errors
+- 🧪 **Well Tested** — 457+ native unit tests, CI-ready
 - 🏗️ **Clean Architecture** — Layered design with separated HTTP transport, providers, and conversation management
 
 ---
@@ -52,7 +53,7 @@ Serial.println(res.content);
 ## 🏆 Why ESPAI?
 
 - **Secure by design** — Embedded root CA certificates for proper TLS verification out of the box
-- **Production-ready** — 445+ unit tests running natively, so you can refactor and ship with confidence
+- **Production-ready** — 457+ unit tests running natively, so you can refactor and ship with confidence
 - **Conversation memory** — Built-in multi-turn history with automatic pruning and JSON serialization
 - **Write once, run on any provider** — Define tools once, unified schema works across OpenAI, Claude, Gemini, and Ollama
 - **Your choice of tooling** — First-class support for both PlatformIO and Arduino IDE
@@ -129,6 +130,10 @@ void loop() {}
 | [ToolCalling](examples/ToolCalling) | Function calling workflow |
 | [CustomOptions](examples/CustomOptions) | All configuration options |
 | [ErrorHandling](examples/ErrorHandling) | Retry logic and error handling |
+| [StreamingToolCalling](examples/StreamingToolCalling) | Tool calling with streaming responses |
+| [AnthropicChat](examples/AnthropicChat) | Using Anthropic Claude models |
+| [GeminiChat](examples/GeminiChat) | Using Google Gemini models |
+| [AsyncChat](examples/AsyncChat) | Non-blocking async requests (FreeRTOS) |
 
 ---
 
