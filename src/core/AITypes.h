@@ -138,7 +138,8 @@ enum class ErrorCode : uint8_t {
     OutOfMemory,
     ProviderNotSupported,
     NotConfigured,
-    StreamingError
+    StreamingError,
+    ResponseTooLarge
 };
 
 struct Message {
@@ -151,7 +152,6 @@ struct Message {
     Message(Role r, const String& c) : role(r), content(c), name(), toolCallsJson() {}
     Message(Role r, const String& c, const String& n) : role(r), content(c), name(n), toolCallsJson() {}
 
-    // Check if this message has tool calls (for assistant messages)
     bool hasToolCalls() const { return !toolCallsJson.isEmpty(); }
 };
 
@@ -269,6 +269,7 @@ inline const char* errorCodeToString(ErrorCode code) {
         case ErrorCode::ProviderNotSupported:return "ProviderNotSupported";
         case ErrorCode::NotConfigured:       return "NotConfigured";
         case ErrorCode::StreamingError:      return "StreamingError";
+        case ErrorCode::ResponseTooLarge:    return "ResponseTooLarge";
         default:                             return "Unknown";
     }
 }

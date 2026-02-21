@@ -1,5 +1,6 @@
 #include "AIProvider.h"
 #include <cmath>
+#include <memory>
 
 #ifdef ARDUINO
 #include "../http/HttpTransportESP32.h"
@@ -71,6 +72,9 @@ Response AIProvider::chat(
     }
 
     if (!httpResp.success) {
+        if (httpResp.responseTooLarge) {
+            return Response::fail(ErrorCode::ResponseTooLarge, httpResp.body, httpResp.statusCode);
+        }
         return handleHttpError(httpResp.statusCode, httpResp.body);
     }
 
@@ -172,6 +176,58 @@ bool AIProvider::chatStream(
 #endif
 }
 #endif
+
+#if ESPAI_ENABLE_ASYNC
+ChatRequest* AIProvider::chatAsync(
+    const std::vector<Message>& messages,
+    const ChatOptions& options,
+    AsyncChatCallback onComplete
+) {
+    if (_asyncRunner.isBusy()) return nullptr;
+
+    auto msgsCopy = std::make_shared<std::vector<Message>>(messages);
+    auto optsCopy = std::make_shared<ChatOptions>(options);
+
+    bool launched = _asyncRunner.launch(
+        [this, msgsCopy, optsCopy]() -> Response {
+            return this->chat(*msgsCopy, *optsCopy);
+        },
+        onComplete
+    );
+
+    return launched ? _asyncRunner.getRequest() : nullptr;
+}
+
+ChatRequest* AIProvider::chatStreamAsync(
+    const std::vector<Message>& messages,
+    const ChatOptions& options,
+    StreamCallback streamCb,
+    AsyncDoneCallback onDone
+) {
+    if (_asyncRunner.isBusy()) return nullptr;
+
+    auto msgsCopy = std::make_shared<std::vector<Message>>(messages);
+    auto optsCopy = std::make_shared<ChatOptions>(options);
+
+    bool launched = _asyncRunner.launchStream(
+        [this, msgsCopy, optsCopy](StreamCallback cb) -> bool {
+            return this->chatStream(*msgsCopy, *optsCopy, cb);
+        },
+        streamCb,
+        onDone
+    );
+
+    return launched ? _asyncRunner.getRequest() : nullptr;
+}
+
+bool AIProvider::isAsyncBusy() const {
+    return _asyncRunner.isBusy();
+}
+
+void AIProvider::cancelAsync() {
+    _asyncRunner.cancel();
+}
+#endif // ESPAI_ENABLE_ASYNC
 
 #if ESPAI_ENABLE_TOOLS
 void AIProvider::addTool(const Tool& tool) {

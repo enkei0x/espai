@@ -32,6 +32,15 @@ public:
     Response chatStream(const String& message, const ChatOptions& options, StreamCallback callback);
 #endif
 
+#if ESPAI_ENABLE_ASYNC
+    ChatRequest* chatAsync(const String& message, AsyncChatCallback onComplete = nullptr);
+    ChatRequest* chatAsync(const String& message, const ChatOptions& options, AsyncChatCallback onComplete = nullptr);
+    ChatRequest* chatStreamAsync(const String& message, StreamCallback streamCb, AsyncDoneCallback onDone = nullptr);
+    ChatRequest* chatStreamAsync(const String& message, const ChatOptions& options, StreamCallback streamCb, AsyncDoneCallback onDone = nullptr);
+    bool isAsyncBusy() const;
+    void cancelAsync();
+#endif
+
     const String& getLastError() const;
     int16_t getLastHttpStatus() const;
     void reset();

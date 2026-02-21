@@ -7,6 +7,10 @@
 #include <ArduinoJson.h>
 #include <vector>
 
+#if ESPAI_ENABLE_ASYNC
+#include "../async/AsyncTaskRunner.h"
+#endif
+
 namespace ESPAI {
 
 struct HttpRequest {
@@ -16,25 +20,34 @@ struct HttpRequest {
     String contentType;
     std::vector<std::pair<String, String>> headers;
     uint32_t timeout;
+    uint32_t maxResponseSize;
 
     HttpRequest()
         : method("POST")
         , contentType("application/json")
-        , timeout(ESPAI_HTTP_TIMEOUT_MS) {}
+        , timeout(ESPAI_HTTP_TIMEOUT_MS)
+        , maxResponseSize(ESPAI_MAX_RESPONSE_SIZE) {}
 };
 
 struct HttpResponse {
     int16_t statusCode;
     String body;
     bool success;
+    bool responseTooLarge;
     int32_t retryAfterSeconds;
 
-    HttpResponse() : statusCode(0), success(false), retryAfterSeconds(-1) {}
+    HttpResponse() : statusCode(0), success(false), responseTooLarge(false), retryAfterSeconds(-1) {}
 };
 
 class AIProvider {
 public:
-    virtual ~AIProvider() = default;
+    virtual ~AIProvider() {
+#if ESPAI_ENABLE_ASYNC
+        // Wait for async task to complete before members are destroyed.
+        // This prevents use-after-free if the task captures 'this'.
+        _asyncRunner.waitForCompletion();
+#endif
+    }
 
     Response chat(
         const std::vector<Message>& messages,
@@ -75,6 +88,24 @@ public:
         return _apiKey.length() > 0 && _model.length() > 0;
     }
 
+#if ESPAI_ENABLE_ASYNC
+    ChatRequest* chatAsync(
+        const std::vector<Message>& messages,
+        const ChatOptions& options,
+        AsyncChatCallback onComplete = nullptr
+    );
+
+    ChatRequest* chatStreamAsync(
+        const std::vector<Message>& messages,
+        const ChatOptions& options,
+        StreamCallback streamCb,
+        AsyncDoneCallback onDone = nullptr
+    );
+
+    bool isAsyncBusy() const;
+    void cancelAsync();
+#endif
+
 #if ESPAI_ENABLE_TOOLS
     void addTool(const Tool& tool);
     void clearTools();
@@ -90,6 +121,10 @@ protected:
     uint32_t _timeout = ESPAI_HTTP_TIMEOUT_MS;
     RetryConfig _retryConfig;
     bool _streamingRequest = false;
+
+#if ESPAI_ENABLE_ASYNC
+    AsyncTaskRunner _asyncRunner;
+#endif
 
     static bool isRetryableStatus(int16_t statusCode);
     static uint32_t calculateRetryDelay(const RetryConfig& config, uint8_t attempt, int32_t retryAfterSeconds);
