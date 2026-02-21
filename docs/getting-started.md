@@ -4,7 +4,7 @@ Welcome to ESPAI! This guide will help you get up and running in minutes.
 
 ## Prerequisites
 
-- ESP32 board (any variant: ESP32, ESP32-S3, ESP32-C3)
+- ESP32 board (any variant: ESP32, ESP32-S2, ESP32-S3, ESP32-C3)
 - Arduino IDE or PlatformIO
 - WiFi network
 - API key from [OpenAI](https://platform.openai.com/api-keys), [Anthropic](https://console.anthropic.com/), or [Google AI Studio](https://aistudio.google.com/apikey) — or use [Ollama](https://ollama.com/) for local LLMs (no key needed)
@@ -116,3 +116,4 @@ To save ~10KB flash, disable unused providers before including ESPAI:
 - [Providers Guide](providers.md) - OpenAI, Anthropic, Gemini, Ollama and more
 - [Streaming](streaming.md) - Real-time responses
 - [Tool Calling](tool-calling.md) - Let AI call your functions
+- [Async Guide](async.md) - Non-blocking requests with FreeRTOS

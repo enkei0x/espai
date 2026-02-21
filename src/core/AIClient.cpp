@@ -161,6 +161,55 @@ Response AIClient::chatStream(const String& message, const ChatOptions& options,
 }
 #endif
 
+#if ESPAI_ENABLE_ASYNC
+ChatRequest* AIClient::chatAsync(const String& message, AsyncChatCallback onComplete) {
+    ChatOptions options;
+    return chatAsync(message, options, onComplete);
+}
+
+ChatRequest* AIClient::chatAsync(const String& message, const ChatOptions& options, AsyncChatCallback onComplete) {
+    if (!_configured || !_providerInstance) return nullptr;
+    if (message.isEmpty()) return nullptr;
+
+    std::vector<Message> messages;
+    if (!options.systemPrompt.isEmpty()) {
+        messages.push_back(Message(Role::System, options.systemPrompt));
+    }
+    messages.push_back(Message(Role::User, message));
+
+    return _providerInstance->chatAsync(messages, options, onComplete);
+}
+
+ChatRequest* AIClient::chatStreamAsync(const String& message, StreamCallback streamCb, AsyncDoneCallback onDone) {
+    ChatOptions options;
+    return chatStreamAsync(message, options, streamCb, onDone);
+}
+
+ChatRequest* AIClient::chatStreamAsync(const String& message, const ChatOptions& options, StreamCallback streamCb, AsyncDoneCallback onDone) {
+    if (!_configured || !_providerInstance) return nullptr;
+    if (message.isEmpty()) return nullptr;
+
+    std::vector<Message> messages;
+    if (!options.systemPrompt.isEmpty()) {
+        messages.push_back(Message(Role::System, options.systemPrompt));
+    }
+    messages.push_back(Message(Role::User, message));
+
+    return _providerInstance->chatStreamAsync(messages, options, streamCb, onDone);
+}
+
+bool AIClient::isAsyncBusy() const {
+    if (!_providerInstance) return false;
+    return _providerInstance->isAsyncBusy();
+}
+
+void AIClient::cancelAsync() {
+    if (_providerInstance) {
+        _providerInstance->cancelAsync();
+    }
+}
+#endif // ESPAI_ENABLE_ASYNC
+
 const String& AIClient::getLastError() const {
     return _lastError;
 }

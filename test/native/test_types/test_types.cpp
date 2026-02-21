@@ -146,6 +146,17 @@ void test_error_code_to_string() {
     TEST_ASSERT_EQUAL_STRING("RateLimited", ESPAI::errorCodeToString(ESPAI::ErrorCode::RateLimited));
     TEST_ASSERT_EQUAL_STRING("ParseError", ESPAI::errorCodeToString(ESPAI::ErrorCode::ParseError));
     TEST_ASSERT_EQUAL_STRING("OutOfMemory", ESPAI::errorCodeToString(ESPAI::ErrorCode::OutOfMemory));
+    TEST_ASSERT_EQUAL_STRING("ResponseTooLarge", ESPAI::errorCodeToString(ESPAI::ErrorCode::ResponseTooLarge));
+}
+
+void test_response_too_large_error() {
+    ESPAI::Response resp = ESPAI::Response::fail(
+        ESPAI::ErrorCode::ResponseTooLarge,
+        "Response too large: 65536 bytes"
+    );
+    TEST_ASSERT_FALSE(resp.success);
+    TEST_ASSERT_EQUAL(ESPAI::ErrorCode::ResponseTooLarge, resp.error);
+    TEST_ASSERT_EQUAL_STRING("ResponseTooLarge", ESPAI::errorCodeToString(resp.error));
 }
 
 int main(int argc, char** argv) {
@@ -173,6 +184,7 @@ int main(int argc, char** argv) {
 
     RUN_TEST(test_error_code_enum_values);
     RUN_TEST(test_error_code_to_string);
+    RUN_TEST(test_response_too_large_error);
 
     return UNITY_END();
 }

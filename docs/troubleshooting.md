@@ -214,23 +214,18 @@ ESPAI validates SSL certificates by default to protect your API keys from man-in
 
 **Solutions:**
 
-1. **Add delay between requests**
+1. **Use built-in retry**
    ```cpp
-   delay(1000);  // Wait 1 second between requests
+   RetryConfig retry;
+   retry.enabled = true;
+   retry.maxRetries = 3;
+   ai.setRetryConfig(retry);
+   // Requests now auto-retry with exponential backoff
    ```
 
-2. **Implement exponential backoff**
+2. **Add delay between requests**
    ```cpp
-   int retryDelay = 1000;
-   for (int i = 0; i < 3; i++) {
-       Response resp = ai.chat(msgs, opts);
-       if (resp.success) break;
-
-       if (resp.error == ErrorCode::RateLimited) {
-           delay(retryDelay);
-           retryDelay *= 2;  // Double delay each retry
-       }
-   }
+   delay(1000);  // Wait 1 second between requests
    ```
 
 3. **Upgrade API plan**

@@ -196,6 +196,38 @@ String GeminiProvider::buildRequestBody(
     return output;
 }
 
+void GeminiProvider::parseCandidateParts(JsonArray parts, String& outText, bool joinWithNewline) {
+    for (JsonObject part : parts) {
+        if (part["thought"] | false) {
+            continue;
+        }
+
+        if (!part["text"].isNull()) {
+            if (joinWithNewline && !outText.isEmpty()) {
+                outText += "\n";
+            }
+            outText += part["text"].as<String>();
+        }
+#if ESPAI_ENABLE_TOOLS
+        if (!part["functionCall"].isNull()) {
+            JsonObject fc = part["functionCall"];
+            ToolCall toolCall;
+            toolCall.name = fc["name"].as<String>();
+
+            String argsStr;
+            serializeJson(fc["args"], argsStr);
+            toolCall.arguments = argsStr;
+
+            toolCall.id = "gemini_tc_" + String(static_cast<int>(_toolCallCounter++));
+
+            if (!toolCall.name.isEmpty()) {
+                _lastToolCalls.push_back(toolCall);
+            }
+        }
+#endif
+    }
+}
+
 Response GeminiProvider::parseSingleResponse(const String& json) {
     Response response;
 
@@ -242,36 +274,7 @@ Response GeminiProvider::parseSingleResponse(const String& json) {
     String textContent;
 
     if (!content["parts"].isNull()) {
-        JsonArray parts = content["parts"];
-        for (JsonObject part : parts) {
-            if (part["thought"] | false) {
-                continue;
-            }
-
-            if (!part["text"].isNull()) {
-                if (!textContent.isEmpty()) {
-                    textContent += "\n";
-                }
-                textContent += part["text"].as<String>();
-            }
-#if ESPAI_ENABLE_TOOLS
-            if (!part["functionCall"].isNull()) {
-                JsonObject fc = part["functionCall"];
-                ToolCall toolCall;
-                toolCall.name = fc["name"].as<String>();
-
-                String argsStr;
-                serializeJson(fc["args"], argsStr);
-                toolCall.arguments = argsStr;
-
-                toolCall.id = "gemini_tc_" + String(static_cast<int>(_toolCallCounter++));
-
-                if (!toolCall.name.isEmpty()) {
-                    _lastToolCalls.push_back(toolCall);
-                }
-            }
-#endif
-        }
+        parseCandidateParts(content["parts"], textContent, true);
     }
 
     response.content = textContent;
@@ -328,29 +331,7 @@ Response GeminiProvider::parseResponse(const String& responseBody) {
                         if (!firstCandidate["content"].isNull()) {
                             JsonObject content = firstCandidate["content"];
                             if (!content["parts"].isNull()) {
-                                JsonArray parts = content["parts"];
-                                for (JsonObject part : parts) {
-                                    if (part["thought"] | false) {
-                                        continue;
-                                    }
-                                    if (!part["text"].isNull()) {
-                                        allText += part["text"].as<String>();
-                                    }
-#if ESPAI_ENABLE_TOOLS
-                                    if (!part["functionCall"].isNull()) {
-                                        JsonObject fc = part["functionCall"];
-                                        ToolCall toolCall;
-                                        toolCall.name = fc["name"].as<String>();
-                                        String argsStr;
-                                        serializeJson(fc["args"], argsStr);
-                                        toolCall.arguments = argsStr;
-                                        toolCall.id = "gemini_tc_" + String(static_cast<int>(_toolCallCounter++));
-                                        if (!toolCall.name.isEmpty()) {
-                                            _lastToolCalls.push_back(toolCall);
-                                        }
-                                    }
-#endif
-                                }
+                                parseCandidateParts(content["parts"], allText, false);
                             }
                         }
 

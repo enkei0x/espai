@@ -51,16 +51,19 @@ Error types returned in responses.
 
 ```cpp
 enum class ErrorCode {
-    None,              // No error
-    NetworkError,      // Connection failed
-    Timeout,           // Request timed out
-    AuthError,         // Invalid API key
-    RateLimited,       // Too many requests
-    ServerError,       // API server error
-    ParseError,        // Invalid JSON response
-    InvalidRequest,    // Bad request parameters
-    NotConfigured,     // Provider not set up
-    ProviderNotSupported
+    None,                // No error
+    NetworkError,        // Connection failed
+    Timeout,             // Request timed out
+    AuthError,           // Invalid API key
+    RateLimited,         // Too many requests
+    InvalidRequest,      // Bad request parameters
+    ServerError,         // API server error
+    ParseError,          // Invalid JSON response
+    OutOfMemory,         // Memory allocation failed
+    ProviderNotSupported,// Provider not available
+    NotConfigured,       // Provider not set up
+    StreamingError,      // Error during streaming
+    ResponseTooLarge     // Response exceeded max size
 };
 ```
 
@@ -106,13 +109,14 @@ struct Response {
     String content;
     ErrorCode error;
     String errorMessage;
-    int httpStatus;
-    int promptTokens;
-    int completionTokens;
+    int16_t httpStatus;
+    uint32_t promptTokens;
+    uint32_t completionTokens;
 
     // Methods
-    int totalTokens() const;
-    static Response fail(ErrorCode code, const String& message);
+    uint32_t totalTokens() const;
+    static Response ok(const String& content);
+    static Response fail(ErrorCode code, const String& message, int16_t status = 0);
 };
 ```
 
@@ -133,13 +137,14 @@ Options for chat requests.
 
 ```cpp
 struct ChatOptions {
-    float temperature = 0.7f;      // Creativity (0.0 - 2.0)
-    int maxTokens = 0;             // Max response length (0 = default)
-    float topP = 1.0f;             // Nucleus sampling
-    float frequencyPenalty = 0.0f; // Reduce repetition
-    float presencePenalty = 0.0f;  // Encourage new topics
-    String model;                  // Override default model
-    String systemPrompt;           // System instructions
+    float temperature = 0.7f;       // Creativity (0.0 - 2.0)
+    int16_t maxTokens = 1024;       // Max response length
+    String model;                   // Override default model
+    String systemPrompt;            // System instructions
+    float topP = 1.0f;              // Nucleus sampling
+    float frequencyPenalty = 0.0f;  // Reduce repetition
+    float presencePenalty = 0.0f;   // Encourage new topics
+    int32_t thinkingBudget = -1;    // Gemini 2.5+: thinking token budget (-1 = default, 0 = disable)
 };
 ```
 
@@ -160,8 +165,24 @@ struct HttpRequest {
     String url;
     String method;
     String body;
+    String contentType;
     std::vector<std::pair<String, String>> headers;
-    int timeout;
+    uint32_t timeout;
+    uint32_t maxResponseSize;
+};
+```
+
+### HttpResponse
+
+HTTP response from transport layer.
+
+```cpp
+struct HttpResponse {
+    int16_t statusCode;
+    String body;
+    bool success;
+    bool responseTooLarge;
+    int32_t retryAfterSeconds;
 };
 ```
 
@@ -263,7 +284,7 @@ Conversation();
 | `setSystemPrompt(prompt)` | Set system instructions |
 | `addUserMessage(content)` | Add user message |
 | `addAssistantMessage(content)` | Add AI response |
-| `addMessage(message)` | Add any message |
+| `addMessage(role, content)` | Add any message |
 | `getMessages()` | Get all messages |
 | `setMaxMessages(n)` | Set max history size |
 | `clear()` | Clear all messages |
@@ -337,6 +358,56 @@ struct ToolResult {
 ```
 
 See [Tool Calling Guide](tool-calling.md) for complete examples.
+
+---
+
+## GeminiProvider
+
+Provider for Google Gemini models.
+
+### Constructor
+
+```cpp
+GeminiProvider(const String& apiKey, const String& model = "gemini-2.5-flash");
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `chat(messages, options)` | Send chat request |
+| `chatStream(messages, options, callback)` | Stream response |
+| `setModel(model)` | Set default model |
+| `setBaseUrl(url)` | Set custom API endpoint |
+| `setTimeout(ms)` | Set request timeout |
+| `addTool(tool)` | Register a tool |
+| `clearTools()` | Remove all tools |
+| `hasToolCalls()` | Check if last response has tool calls |
+| `getLastToolCalls()` | Get tool calls from last response |
+| `getAssistantMessageWithToolCalls(content)` | Build assistant message with tool calls |
+
+### Gemini-Specific Features
+
+- **Authentication:** Uses `x-goog-api-key` header (not `Authorization: Bearer`)
+- **SSE format:** Uses Gemini-specific SSE streaming (`streamGenerateContent?alt=sse`)
+- **Tool call IDs:** Synthesized as `gemini_tc_N` (Gemini API does not return tool call IDs)
+- **Thinking budget:** Use `ChatOptions::thinkingBudget` to control thinking tokens for Gemini 2.5+ models
+
+### Example
+
+```cpp
+GeminiProvider gemini("AIza...");
+gemini.setModel("gemini-2.5-pro");
+
+std::vector<Message> msgs;
+msgs.push_back(Message(Role::User, "Hello Gemini!"));
+
+// Use thinking budget for complex tasks (Gemini 2.5+ only)
+ChatOptions opts;
+opts.thinkingBudget = 8192;
+
+Response resp = gemini.chat(msgs, opts);
+```
 
 ---
 
@@ -493,6 +564,253 @@ transport->setInsecure(true);  // Logs a warning
 
 - **Default behavior:** SSL certificate validation is ENABLED for HTTPS URLs
 - **Plain HTTP:** Used automatically for `http://` URLs (local providers) — no SSL overhead
-- **Built-in certificates:** DigiCert Global Root CA and ISRG Root X1 (valid until 2031+)
+- **Built-in certificates:** GlobalSign (OpenAI, Anthropic) and GTS Root R1 (Gemini)
 - **setInsecure(true):** Logs a warning and disables validation - use only for testing
 - **Custom endpoints:** Use `setCACert()` with appropriate certificates
+
+---
+
+## RetryConfig
+
+Configure automatic retry with exponential backoff for failed requests.
+
+```cpp
+struct RetryConfig {
+    bool enabled = false;           // Enable/disable retries
+    uint8_t maxRetries = 3;         // Maximum retry attempts
+    uint32_t initialDelayMs = 1000; // Initial delay between retries
+    float backoffMultiplier = 2.0f; // Delay multiplier per retry
+    uint32_t maxDelayMs = 30000;    // Maximum delay cap
+};
+```
+
+### Usage
+
+```cpp
+RetryConfig retry;
+retry.enabled = true;
+retry.maxRetries = 3;
+retry.initialDelayMs = 1000;
+
+ai.setRetryConfig(retry);
+
+// Requests will now automatically retry on 429, 500, 502, 503, 504
+Response resp = ai.chat(messages, options);
+```
+
+Retries are attempted for rate limiting (429) and server errors (5xx). The delay between retries grows exponentially: `initialDelayMs * backoffMultiplier^attempt`, capped at `maxDelayMs`. If the server returns a `Retry-After` header, that value is used instead.
+
+---
+
+## AIClient
+
+High-level convenience wrapper around providers. Provides a simplified string-based API and manages provider lifecycle.
+
+### Constructors
+
+```cpp
+AIClient();
+AIClient(Provider provider, const String& apiKey);
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `setProvider(provider, apiKey)` | Set provider type and API key |
+| `setBaseUrl(url)` | Set custom API endpoint |
+| `setModel(model)` | Override default model |
+| `setTimeout(ms)` | Set request timeout |
+| `getProvider()` | Get current provider type |
+| `getModel()` | Get current model name |
+| `isConfigured()` | Check if provider is ready |
+| `chat(message)` | Send a simple message |
+| `chat(message, options)` | Send with options |
+| `chat(systemPrompt, message)` | Send with system prompt |
+| `chatStream(message, callback)` | Stream a response |
+| `chatStream(message, options, callback)` | Stream with options |
+| `chatAsync(message, onComplete)` | Send async (FreeRTOS) |
+| `chatStreamAsync(message, streamCb, onDone)` | Stream async (FreeRTOS) |
+| `isAsyncBusy()` | Check if async request is running |
+| `cancelAsync()` | Cancel running async request |
+| `getLastError()` | Get last error message |
+| `getLastHttpStatus()` | Get last HTTP status code |
+| `reset()` | Clear error state |
+| `getProviderInstance()` | Access underlying AIProvider |
+
+### Example
+
+```cpp
+AIClient client(Provider::OpenAI, "sk-...");
+client.setModel("gpt-4o");
+
+// Simple string-based API
+Response resp = client.chat("Hello from ESP32!");
+
+// With system prompt
+resp = client.chat("You are a helpful IoT assistant.", "Turn on the lights");
+
+// Streaming
+client.chatStream("Tell me a story", [](const String& chunk, bool done) {
+    Serial.print(chunk);
+});
+```
+
+---
+
+## Async API (FreeRTOS)
+
+Non-blocking chat requests using FreeRTOS tasks. Available on ESP32 when `ESPAI_ENABLE_ASYNC` is enabled (default on Arduino).
+
+### AsyncStatus
+
+```cpp
+enum class AsyncStatus {
+    Idle,       // No task running
+    Running,    // Task in progress
+    Completed,  // Task finished successfully
+    Cancelled,  // Task was cancelled
+    Error       // Task failed
+};
+```
+
+### ChatRequest
+
+Handle returned by async methods. Use to poll status, get results, or cancel.
+
+```cpp
+struct ChatRequest {
+    AsyncStatus getStatus() const;
+    bool isComplete() const;
+    bool isCancelled() const;
+    Response getResult() const;
+    void cancel();
+    bool poll();   // Check status & invoke callback if done
+};
+```
+
+### Callbacks
+
+```cpp
+using AsyncChatCallback = std::function<void(const Response&)>;
+using AsyncDoneCallback = std::function<void(const Response&)>;
+```
+
+### Provider-Level Async
+
+```cpp
+ChatRequest* chatAsync(messages, options, onComplete);
+ChatRequest* chatStreamAsync(messages, options, streamCb, onDone);
+bool isAsyncBusy() const;
+void cancelAsync();
+```
+
+### AIClient-Level Async
+
+```cpp
+ChatRequest* chatAsync(message, onComplete);
+ChatRequest* chatAsync(message, options, onComplete);
+ChatRequest* chatStreamAsync(message, streamCb, onDone);
+ChatRequest* chatStreamAsync(message, options, streamCb, onDone);
+bool isAsyncBusy() const;
+void cancelAsync();
+```
+
+### Example
+
+```cpp
+AIClient client(Provider::OpenAI, "sk-...");
+
+// Fire-and-forget with callback
+client.chatAsync("Hello!", [](const Response& resp) {
+    Serial.println(resp.content);
+});
+
+// Poll-based
+ChatRequest* req = client.chatAsync("Hello!");
+while (!req->isComplete()) {
+    req->poll();
+    // Do other work...
+    delay(10);
+}
+Serial.println(req->getResult().content);
+
+// Async streaming
+client.chatStreamAsync("Tell me a story",
+    [](const String& chunk, bool done) { Serial.print(chunk); },
+    [](const Response& resp) { Serial.println("\nDone!"); }
+);
+
+// Cancel
+client.cancelAsync();
+```
+
+### Configuration
+
+```cpp
+#define ESPAI_ENABLE_ASYNC      1       // Enable async (default: 1 on Arduino, 0 on native)
+#define ESPAI_ASYNC_STACK_SIZE  20480   // FreeRTOS task stack size (bytes)
+#define ESPAI_ASYNC_TASK_PRIORITY 3     // FreeRTOS task priority
+```
+
+---
+
+## ToolRegistry
+
+Standalone tool management and execution engine. Use when you need to manage tools independently of a provider.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `registerTool(tool)` | Register a tool with handler |
+| `unregisterTool(name)` | Remove a tool by name |
+| `clearTools()` | Remove all tools |
+| `findTool(name)` | Find tool by name |
+| `hasTool(name)` | Check if tool exists |
+| `toolCount()` | Get number of registered tools |
+| `executeToolCall(call)` | Execute a single tool call |
+| `executeToolCalls(calls)` | Execute multiple tool calls |
+| `toOpenAISchema()` | Generate OpenAI-format tool schema JSON |
+| `toAnthropicSchema()` | Generate Anthropic-format tool schema JSON |
+| `setMaxIterations(n)` | Set max tool iterations (default: 10) |
+
+### Example
+
+```cpp
+ToolRegistry registry;
+
+Tool tempTool("get_temperature", "Get room temperature",
+    R"({"type":"object","properties":{}})",
+    [](const String& args) { return "{\"temp\": 23.5}"; }
+);
+
+registry.registerTool(tempTool);
+
+// Execute tool calls from AI response
+auto results = registry.executeToolCalls(ai.getLastToolCalls());
+```
+
+---
+
+## Configuration Reference
+
+All compile-time configuration defines (set before `#include <ESPAI.h>`):
+
+| Define | Default | Description |
+|--------|---------|-------------|
+| `ESPAI_ENABLE_STREAMING` | `1` | Enable SSE streaming support |
+| `ESPAI_ENABLE_TOOLS` | `1` | Enable tool/function calling |
+| `ESPAI_ENABLE_ASYNC` | `1` (Arduino) / `0` (native) | Enable FreeRTOS async API |
+| `ESPAI_PROVIDER_OPENAI` | `1` | Include OpenAI provider |
+| `ESPAI_PROVIDER_ANTHROPIC` | `1` | Include Anthropic provider |
+| `ESPAI_PROVIDER_GEMINI` | `1` | Include Gemini provider |
+| `ESPAI_PROVIDER_OLLAMA` | `1` | Include Ollama provider |
+| `ESPAI_MAX_MESSAGES` | `20` | Default max conversation messages |
+| `ESPAI_HTTP_TIMEOUT_MS` | `30000` | Default HTTP timeout (ms) |
+| `ESPAI_MAX_TOOLS` | `10` | Maximum registered tools |
+| `ESPAI_MAX_RESPONSE_SIZE` | `32768` | Maximum HTTP response body size (bytes) |
+| `ESPAI_MAX_TOOL_ITERATIONS` | `10` | Maximum tool call iterations |
+| `ESPAI_ASYNC_STACK_SIZE` | `20480` | FreeRTOS async task stack size |
+| `ESPAI_ASYNC_TASK_PRIORITY` | `3` | FreeRTOS async task priority |
+| `ESPAI_DEBUG` | `0` | Enable debug logging (`ESPAI_LOG_E/W/I/D`) |

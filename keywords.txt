@@ -7,6 +7,14 @@
 
 ESPAI	KEYWORD1
 AIClient	KEYWORD1
+AIProvider	KEYWORD1
+OpenAIProvider	KEYWORD1
+AnthropicProvider	KEYWORD1
+GeminiProvider	KEYWORD1
+OllamaProvider	KEYWORD1
+OpenAICompatibleProvider	KEYWORD1
+OpenAICompatibleConfig	KEYWORD1
+ProviderFactory	KEYWORD1
 Provider	KEYWORD1
 Role	KEYWORD1
 ErrorCode	KEYWORD1
@@ -14,6 +22,19 @@ Message	KEYWORD1
 Response	KEYWORD1
 ChatOptions	KEYWORD1
 StreamCallback	KEYWORD1
+Conversation	KEYWORD1
+Tool	KEYWORD1
+ToolCall	KEYWORD1
+ToolResult	KEYWORD1
+ToolRegistry	KEYWORD1
+RetryConfig	KEYWORD1
+AsyncTaskRunner	KEYWORD1
+ChatRequest	KEYWORD1
+AsyncStatus	KEYWORD1
+AsyncChatCallback	KEYWORD1
+AsyncDoneCallback	KEYWORD1
+HttpTransportESP32	KEYWORD1
+SSEParser	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -32,11 +53,64 @@ chatStream	KEYWORD2
 getLastError	KEYWORD2
 getLastHttpStatus	KEYWORD2
 reset	KEYWORD2
+getProviderInstance	KEYWORD2
+
+# Async methods
+chatAsync	KEYWORD2
+chatStreamAsync	KEYWORD2
+isAsyncBusy	KEYWORD2
+cancelAsync	KEYWORD2
+
+# Provider methods
+setApiKey	KEYWORD2
+setRetryConfig	KEYWORD2
+getRetryConfig	KEYWORD2
+
+# Tool methods
+addTool	KEYWORD2
+clearTools	KEYWORD2
+hasToolCalls	KEYWORD2
+getLastToolCalls	KEYWORD2
+getAssistantMessageWithToolCalls	KEYWORD2
+registerTool	KEYWORD2
+unregisterTool	KEYWORD2
+findTool	KEYWORD2
+executeToolCall	KEYWORD2
+executeToolCalls	KEYWORD2
+toOpenAISchema	KEYWORD2
+toAnthropicSchema	KEYWORD2
+
+# Conversation methods
+setSystemPrompt	KEYWORD2
+addUserMessage	KEYWORD2
+addAssistantMessage	KEYWORD2
+addMessage	KEYWORD2
+getMessages	KEYWORD2
+setMaxMessages	KEYWORD2
+estimateTokens	KEYWORD2
+toJson	KEYWORD2
+fromJson	KEYWORD2
+
+# ChatRequest methods
+getStatus	KEYWORD2
+isComplete	KEYWORD2
+isCancelled	KEYWORD2
+getResult	KEYWORD2
+cancel	KEYWORD2
+poll	KEYWORD2
 
 # Response methods
 totalTokens	KEYWORD2
 ok	KEYWORD2
 fail	KEYWORD2
+
+# Transport methods
+setCACert	KEYWORD2
+setInsecure	KEYWORD2
+setReuse	KEYWORD2
+setFollowRedirects	KEYWORD2
+isReady	KEYWORD2
+addCustomHeader	KEYWORD2
 
 # Utility functions
 providerToString	KEYWORD2
@@ -73,10 +147,19 @@ OutOfMemory	LITERAL1
 ProviderNotSupported	LITERAL1
 NotConfigured	LITERAL1
 StreamingError	LITERAL1
+ResponseTooLarge	LITERAL1
+
+# AsyncStatus enum values
+Idle	LITERAL1
+Running	LITERAL1
+Completed	LITERAL1
+Cancelled	LITERAL1
+Error	LITERAL1
 
 # Config defines
 ESPAI_ENABLE_STREAMING	LITERAL1
 ESPAI_ENABLE_TOOLS	LITERAL1
+ESPAI_ENABLE_ASYNC	LITERAL1
 ESPAI_PROVIDER_OPENAI	LITERAL1
 ESPAI_PROVIDER_ANTHROPIC	LITERAL1
 ESPAI_PROVIDER_GEMINI	LITERAL1
@@ -84,5 +167,9 @@ ESPAI_PROVIDER_OLLAMA	LITERAL1
 ESPAI_MAX_MESSAGES	LITERAL1
 ESPAI_HTTP_TIMEOUT_MS	LITERAL1
 ESPAI_MAX_TOOLS	LITERAL1
+ESPAI_MAX_RESPONSE_SIZE	LITERAL1
+ESPAI_MAX_TOOL_ITERATIONS	LITERAL1
+ESPAI_ASYNC_STACK_SIZE	LITERAL1
+ESPAI_ASYNC_TASK_PRIORITY	LITERAL1
 ESPAI_DEBUG	LITERAL1
 ESPAI_VERSION	LITERAL1

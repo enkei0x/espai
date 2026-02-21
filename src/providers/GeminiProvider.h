@@ -44,6 +44,7 @@ private:
     uint32_t _toolCallCounter = 0;
     String buildApiUrl(const String& model, const String& action) const;
     Response parseSingleResponse(const String& json);
+    void parseCandidateParts(JsonArray parts, String& outText, bool joinWithNewline);
 };
 
 std::unique_ptr<AIProvider> createGeminiProvider(const String& apiKey, const String& model);

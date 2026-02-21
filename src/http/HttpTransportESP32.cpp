@@ -7,13 +7,9 @@
 
 namespace ESPAI {
 
-static HttpTransportESP32* _esp32TransportInstance = nullptr;
-
 HttpTransportESP32* getESP32Transport() {
-    if (_esp32TransportInstance == nullptr) {
-        _esp32TransportInstance = new HttpTransportESP32();
-    }
-    return _esp32TransportInstance;
+    static HttpTransportESP32 instance;
+    return &instance;
 }
 
 HttpTransport* getDefaultTransport() {
@@ -26,11 +22,30 @@ HttpTransportESP32::HttpTransportESP32()
     , _reuseConnection(true)
     , _followRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS)
 {
+#if ESPAI_ENABLE_ASYNC
+    _transportMutex = xSemaphoreCreateMutex();
+#endif
     configureSSL();
 }
 
 HttpTransportESP32::~HttpTransportESP32() {
+#if ESPAI_ENABLE_ASYNC
+    if (_transportMutex) {
+        vSemaphoreDelete(_transportMutex);
+        _transportMutex = nullptr;
+    }
+#endif
 }
+
+#if ESPAI_ENABLE_ASYNC
+void HttpTransportESP32::lockTransport() {
+    if (_transportMutex) xSemaphoreTake(_transportMutex, portMAX_DELAY);
+}
+
+void HttpTransportESP32::unlockTransport() {
+    if (_transportMutex) xSemaphoreGive(_transportMutex);
+}
+#endif
 
 void HttpTransportESP32::configureSSL() {
     if (_insecure) {
@@ -138,6 +153,9 @@ String HttpTransportESP32::httpErrorToString(int errorCode) {
 }
 
 HttpResponse HttpTransportESP32::execute(const HttpRequest& request) {
+#if ESPAI_ENABLE_ASYNC
+    lockTransport();
+#endif
     HttpResponse response;
 
     if (!isReady()) {
@@ -146,139 +164,162 @@ HttpResponse HttpTransportESP32::execute(const HttpRequest& request) {
         response.body = _lastError;
         response.success = false;
         ESPAI_LOG_E("HTTP", "WiFi not connected");
-        return response;
-    }
-
-    HTTPClient http;
-
-    if (!setupHttpClient(http, request)) {
-        response.statusCode = 0;
-        response.body = _lastError;
-        response.success = false;
-        return response;
-    }
-
-    ESPAI_LOG_D("HTTP", "Executing %s to %s", request.method.c_str(), request.url.c_str());
-    ESPAI_LOG_D("HTTP", "Body length: %d", request.body.length());
-
-    int httpCode;
-    if (request.method == "POST") {
-        httpCode = http.POST(request.body);
-    } else if (request.method == "GET") {
-        httpCode = http.GET();
-    } else if (request.method == "PUT") {
-        httpCode = http.PUT(request.body);
-    } else if (request.method == "DELETE") {
-        httpCode = http.sendRequest("DELETE", request.body);
     } else {
-        httpCode = http.sendRequest(request.method.c_str(), request.body);
-    }
+        HTTPClient http;
 
-    response.statusCode = httpCode;
+        if (!setupHttpClient(http, request)) {
+            response.statusCode = 0;
+            response.body = _lastError;
+            response.success = false;
+        } else {
+            ESPAI_LOG_D("HTTP", "Executing %s to %s", request.method.c_str(), request.url.c_str());
+            ESPAI_LOG_D("HTTP", "Body length: %d", request.body.length());
 
-    if (httpCode > 0) {
-        response.body = http.getString();
-        response.success = (httpCode >= 200 && httpCode < 300);
-
-        if (httpCode == 429 || httpCode >= 500) {
-            String retryAfter = http.header("Retry-After");
-            if (retryAfter.length() > 0) {
-                response.retryAfterSeconds = atoi(retryAfter.c_str());
+            int httpCode;
+            if (request.method == "POST") {
+                httpCode = http.POST(request.body);
+            } else if (request.method == "GET") {
+                httpCode = http.GET();
+            } else if (request.method == "PUT") {
+                httpCode = http.PUT(request.body);
+            } else if (request.method == "DELETE") {
+                httpCode = http.sendRequest("DELETE", request.body);
+            } else {
+                httpCode = http.sendRequest(request.method.c_str(), request.body);
             }
+
+            response.statusCode = httpCode;
+
+            if (httpCode > 0) {
+                int contentLength = http.getSize();
+                if (contentLength > 0 && static_cast<uint32_t>(contentLength) > request.maxResponseSize) {
+                    _lastError = "Response too large: " + String(contentLength) + " bytes (max " + String(request.maxResponseSize) + ")";
+                    response.responseTooLarge = true;
+                    response.body = _lastError;
+                    response.success = false;
+                    ESPAI_LOG_W("HTTP", "%s", _lastError.c_str());
+                } else {
+                    response.body = http.getString();
+
+                    // Post-read size check (catches chunked responses where Content-Length is unknown)
+                    if (response.body.length() > request.maxResponseSize) {
+                        _lastError = "Response too large: " + String(response.body.length()) + " bytes (max " + String(request.maxResponseSize) + ")";
+                        response.responseTooLarge = true;
+                        response.body = _lastError;
+                        response.success = false;
+                        ESPAI_LOG_W("HTTP", "%s", _lastError.c_str());
+                    } else {
+                        response.success = (httpCode >= 200 && httpCode < 300);
+
+                        if (httpCode == 429 || httpCode >= 500) {
+                            String retryAfter = http.header("Retry-After");
+                            if (retryAfter.length() > 0) {
+                                response.retryAfterSeconds = atoi(retryAfter.c_str());
+                            }
+                        }
+
+                        ESPAI_LOG_D("HTTP", "Response code: %d, body length: %d", httpCode, response.body.length());
+
+                        if (!response.success) {
+                            _lastError = "HTTP " + String(httpCode) + ": " + response.body;
+                            ESPAI_LOG_W("HTTP", "Request failed with code %d", httpCode);
+                        }
+                    }
+                }
+            } else {
+                _lastError = httpErrorToString(httpCode);
+                response.body = _lastError;
+                response.success = false;
+                ESPAI_LOG_E("HTTP", "Request failed: %s", _lastError.c_str());
+            }
+
+            http.end();
         }
-
-        ESPAI_LOG_D("HTTP", "Response code: %d, body length: %d", httpCode, response.body.length());
-
-        if (!response.success) {
-            _lastError = "HTTP " + String(httpCode) + ": " + response.body;
-            ESPAI_LOG_W("HTTP", "Request failed with code %d", httpCode);
-        }
-    } else {
-        _lastError = httpErrorToString(httpCode);
-        response.body = _lastError;
-        response.success = false;
-
-        ESPAI_LOG_E("HTTP", "Request failed: %s", _lastError.c_str());
     }
 
-    http.end();
+#if ESPAI_ENABLE_ASYNC
+    unlockTransport();
+#endif
     return response;
 }
 
 bool HttpTransportESP32::executeStream(const HttpRequest& request, StreamDataCallback callback) {
+#if ESPAI_ENABLE_ASYNC
+    lockTransport();
+#endif
+    bool success = false;
+
     if (!isReady()) {
         _lastError = "WiFi not connected";
         ESPAI_LOG_E("HTTP", "WiFi not connected");
-        return false;
-    }
+    } else {
+        HTTPClient http;
 
-    HTTPClient http;
-
-    if (!setupHttpClient(http, request)) {
-        return false;
-    }
-
-    http.addHeader("Accept", "text/event-stream");
-
-    ESPAI_LOG_D("HTTP", "Starting stream to %s", request.url.c_str());
-
-    int httpCode = http.POST(request.body);
-
-    if (httpCode != HTTP_CODE_OK) {
-        if (httpCode > 0) {
-            _lastError = "HTTP " + String(httpCode);
-            ESPAI_LOG_W("HTTP", "Stream request failed with code %d", httpCode);
+        if (!setupHttpClient(http, request)) {
         } else {
-            _lastError = httpErrorToString(httpCode);
-            ESPAI_LOG_E("HTTP", "Stream request failed: %s", _lastError.c_str());
-        }
-        http.end();
-        return false;
-    }
+            http.addHeader("Accept", "text/event-stream");
 
-    WiFiClient* stream = http.getStreamPtr();
-    if (stream == nullptr) {
-        _lastError = "Failed to get stream";
-        ESPAI_LOG_E("HTTP", "Failed to get stream pointer");
-        http.end();
-        return false;
-    }
+            ESPAI_LOG_D("HTTP", "Starting stream to %s", request.url.c_str());
 
-    uint8_t buffer[256];
-    uint32_t startTime = millis();
-    uint32_t timeout = request.timeout;
-    bool success = true;
+            int httpCode = http.POST(request.body);
 
-    while (http.connected() || stream->available()) {
-        if (millis() - startTime > timeout) {
-            _lastError = "Stream timeout";
-            ESPAI_LOG_W("HTTP", "Stream read timeout");
-            success = false;
-            break;
-        }
+            if (httpCode != HTTP_CODE_OK) {
+                if (httpCode > 0) {
+                    _lastError = "HTTP " + String(httpCode);
+                    ESPAI_LOG_W("HTTP", "Stream request failed with code %d", httpCode);
+                } else {
+                    _lastError = httpErrorToString(httpCode);
+                    ESPAI_LOG_E("HTTP", "Stream request failed: %s", _lastError.c_str());
+                }
+            } else {
+                WiFiClient* stream = http.getStreamPtr();
+                if (stream == nullptr) {
+                    _lastError = "Failed to get stream";
+                    ESPAI_LOG_E("HTTP", "Failed to get stream pointer");
+                } else {
+                    success = true;
+                    uint8_t buffer[256];
+                    uint32_t startTime = millis();
+                    uint32_t timeout = request.timeout;
 
-        size_t available = stream->available();
-        if (available > 0) {
-            size_t toRead = (available < sizeof(buffer)) ? available : sizeof(buffer);
-            size_t bytesRead = stream->readBytes(buffer, toRead);
+                    while (http.connected() || stream->available()) {
+                        if (millis() - startTime > timeout) {
+                            _lastError = "Stream timeout";
+                            ESPAI_LOG_W("HTTP", "Stream read timeout");
+                            success = false;
+                            break;
+                        }
 
-            if (bytesRead > 0) {
-                startTime = millis();
+                        size_t available = stream->available();
+                        if (available > 0) {
+                            size_t toRead = (available < sizeof(buffer)) ? available : sizeof(buffer);
+                            size_t bytesRead = stream->readBytes(buffer, toRead);
 
-                if (!callback(buffer, bytesRead)) {
-                    ESPAI_LOG_D("HTTP", "Stream stopped by callback");
-                    break;
+                            if (bytesRead > 0) {
+                                startTime = millis();
+
+                                if (!callback(buffer, bytesRead)) {
+                                    ESPAI_LOG_D("HTTP", "Stream stopped by callback");
+                                    break;
+                                }
+                            }
+                        } else {
+                            delay(1);
+                        }
+
+                        yield();
+                    }
                 }
             }
-        } else {
-            delay(1);
-        }
 
-        yield();
+            http.end();
+            ESPAI_LOG_D("HTTP", "Stream ended, success=%d", success);
+        }
     }
 
-    http.end();
-    ESPAI_LOG_D("HTTP", "Stream ended, success=%d", success);
+#if ESPAI_ENABLE_ASYNC
+    unlockTransport();
+#endif
     return success;
 }
 

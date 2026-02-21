@@ -5,10 +5,19 @@
 
 #ifdef ARDUINO
 
+#if defined(CONFIG_IDF_TARGET_ESP32H2)
+#error "ESPAI requires WiFi. ESP32-H2 does not have WiFi hardware."
+#endif
+
 #include "HttpTransport.h"
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+
+#if ESPAI_ENABLE_ASYNC
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#endif
 
 namespace ESPAI {
 
@@ -35,6 +44,12 @@ private:
     bool _insecure;
     bool _reuseConnection;
     followRedirects_t _followRedirects;
+
+#if ESPAI_ENABLE_ASYNC
+    SemaphoreHandle_t _transportMutex = nullptr;
+    void lockTransport();
+    void unlockTransport();
+#endif
 
     static bool isHttps(const String& url);
     void configureSSL();

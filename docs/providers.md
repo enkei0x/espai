@@ -86,6 +86,51 @@ Uses `x-api-key: <key>` header (different from OpenAI).
 
 ---
 
+## 🟡 Google Gemini
+
+### Setup
+
+```cpp
+#include <ESPAI.h>
+using namespace ESPAI;
+
+GeminiProvider gemini("AIza-your-api-key");
+```
+
+### Default Model
+
+`gemini-2.5-flash`
+
+### Change Model
+
+```cpp
+gemini.setModel("gemini-2.5-pro");
+gemini.setModel("gemini-2.0-flash");
+```
+
+### Authentication
+
+Uses `x-goog-api-key: <key>` header (different from OpenAI and Anthropic).
+
+### Thinking Budget (Gemini 2.5+)
+
+Control the thinking token budget for complex reasoning tasks:
+
+```cpp
+ChatOptions opts;
+opts.thinkingBudget = 8192;   // Set thinking budget
+opts.thinkingBudget = 0;      // Disable thinking
+opts.thinkingBudget = -1;     // Use provider default (default)
+```
+
+### Gemini-Specific Notes
+
+- Tool call IDs are synthesized as `gemini_tc_N` since the Gemini API doesn't return tool call IDs
+- Uses a Gemini-specific SSE streaming format (`streamGenerateContent?alt=sse`)
+- API URL is constructed per-model: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+
+---
+
 ## 🟠 Ollama (Local LLMs)
 
 ### Setup
@@ -245,6 +290,10 @@ Response resp = ai.chat(messages, options);
 AnthropicProvider claude("sk-ant-...");
 Response resp = claude.chat(messages, options);
 
+// Gemini - same interface!
+GeminiProvider gemini("AIza...");
+Response resp = gemini.chat(messages, options);
+
 // Ollama - same interface, no key needed!
 OllamaProvider ollama;
 Response resp = ollama.chat(messages, options);
@@ -255,6 +304,7 @@ You can even use multiple providers in the same project:
 ```cpp
 OpenAIProvider gpt("sk-...");
 AnthropicProvider claude("sk-ant-...");
+GeminiProvider gemini("AIza...");
 OllamaProvider ollama;
 
 // Use GPT for quick tasks
@@ -262,6 +312,9 @@ auto quick = gpt.chat(simpleMessages, opts);
 
 // Use Claude for complex reasoning
 auto detailed = claude.chat(complexMessages, opts);
+
+// Use Gemini for multimodal tasks
+auto geminiResp = gemini.chat(messages, opts);
 
 // Use Ollama for offline/local processing
 auto local = ollama.chat(simpleMessages, opts);

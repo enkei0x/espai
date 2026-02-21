@@ -38,6 +38,10 @@
 #include "tools/ToolRegistry.h"
 #endif
 
+#if ESPAI_ENABLE_ASYNC
+#include "async/AsyncTaskRunner.h"
+#endif
+
 #define ESPAI_VERSION ESPAI_VERSION_STRING
 
 #endif // ESPAI_H

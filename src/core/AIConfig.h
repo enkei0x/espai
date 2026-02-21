@@ -25,6 +25,22 @@
 #define ESPAI_PROVIDER_OLLAMA       1
 #endif
 
+#ifndef ESPAI_ENABLE_ASYNC
+    #ifdef ARDUINO
+        #define ESPAI_ENABLE_ASYNC  1
+    #else
+        #define ESPAI_ENABLE_ASYNC  0
+    #endif
+#endif
+
+#ifndef ESPAI_ASYNC_STACK_SIZE
+#define ESPAI_ASYNC_STACK_SIZE      20480
+#endif
+
+#ifndef ESPAI_ASYNC_TASK_PRIORITY
+#define ESPAI_ASYNC_TASK_PRIORITY   3
+#endif
+
 #ifndef ESPAI_MAX_MESSAGES
 #define ESPAI_MAX_MESSAGES          20
 #endif
@@ -35,6 +51,10 @@
 
 #ifndef ESPAI_MAX_TOOLS
 #define ESPAI_MAX_TOOLS             10
+#endif
+
+#ifndef ESPAI_MAX_RESPONSE_SIZE
+#define ESPAI_MAX_RESPONSE_SIZE     32768
 #endif
 
 #ifndef ESPAI_DEFAULT_MODEL_OPENAI
