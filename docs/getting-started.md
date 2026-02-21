@@ -21,7 +21,7 @@ platform = espressif32
 board = esp32dev
 framework = arduino
 lib_deps =
-    enkei0x/ESPAI@^0.7.0
+    enkei0x/ESPAI@^0.8.0
 ```
 
 ### Arduino IDE
