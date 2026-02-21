@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - -std=gnu++17
+    - -DNATIVE_TEST
+    - -DUNIT_TEST
+  Remove:
+    - -std=gnu++11
+    - -std=c++11

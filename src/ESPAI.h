@@ -6,6 +6,7 @@
 #include "core/AIClient.h"
 #include "conversation/Conversation.h"
 #include "providers/AIProvider.h"
+#include "providers/OpenAICompatibleProvider.h"
 #include "providers/ProviderFactory.h"
 
 #if ESPAI_PROVIDER_OPENAI
@@ -18,6 +19,10 @@
 
 #if ESPAI_PROVIDER_GEMINI
 #include "providers/GeminiProvider.h"
+#endif
+
+#if ESPAI_PROVIDER_OLLAMA
+#include "providers/OllamaProvider.h"
 #endif
 
 #if ESPAI_ENABLE_STREAMING

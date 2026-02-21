@@ -12,6 +12,10 @@
 #include "GeminiProvider.h"
 #endif
 
+#if ESPAI_PROVIDER_OLLAMA
+#include "OllamaProvider.h"
+#endif
+
 namespace ESPAI {
 
 ProviderCreator ProviderFactory::_creators[MAX_PROVIDERS] = {nullptr};
@@ -24,7 +28,6 @@ void ProviderFactory::ensureInitialized() {
         }
         _initialized = true;
 
-        // Auto-register built-in providers
 #if ESPAI_PROVIDER_OPENAI
         _creators[providerIndex(Provider::OpenAI)] = createOpenAIProvider;
 #endif
@@ -33,6 +36,9 @@ void ProviderFactory::ensureInitialized() {
 #endif
 #if ESPAI_PROVIDER_GEMINI
         _creators[providerIndex(Provider::Gemini)] = createGeminiProvider;
+#endif
+#if ESPAI_PROVIDER_OLLAMA
+        _creators[providerIndex(Provider::Ollama)] = createOllamaProvider;
 #endif
     }
 }
@@ -58,11 +64,7 @@ std::unique_ptr<AIProvider> ProviderFactory::create(
         actualModel = getDefaultModel(type);
     }
 
-    auto provider = _creators[idx](apiKey, actualModel);
-    if (provider) {
-        provider->setBaseUrl(getDefaultBaseUrl(type));
-    }
-    return provider;
+    return _creators[idx](apiKey, actualModel);
 }
 
 std::unique_ptr<AIProvider> ProviderFactory::create(
@@ -119,7 +121,7 @@ const char* ProviderFactory::getDefaultBaseUrl(Provider type) {
         case Provider::Gemini:
             return "https://generativelanguage.googleapis.com/v1beta";
         case Provider::Ollama:
-            return "http://localhost:11434/api/chat";
+            return "http://localhost:11434/v1/chat/completions";
         default:
             return "";
     }

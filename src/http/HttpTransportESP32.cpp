@@ -64,10 +64,20 @@ bool HttpTransportESP32::isReady() const {
     return WiFi.status() == WL_CONNECTED;
 }
 
-bool HttpTransportESP32::setupHttpClient(HTTPClient& http, const HttpRequest& request) {
-    configureSSL();
+bool HttpTransportESP32::isHttps(const String& url) {
+    return url.startsWith("https://");
+}
 
-    if (!http.begin(_wifiClient, request.url)) {
+bool HttpTransportESP32::setupHttpClient(HTTPClient& http, const HttpRequest& request) {
+    bool result;
+    if (isHttps(request.url)) {
+        configureSSL();
+        result = http.begin(_wifiClient, request.url);
+    } else {
+        result = http.begin(_plainClient, request.url);
+    }
+
+    if (!result) {
         _lastError = "Failed to begin HTTP connection";
         ESPAI_LOG_E("HTTP", "Failed to begin connection to: %s", request.url.c_str());
         return false;
