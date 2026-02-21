@@ -22,7 +22,7 @@
 #endif
 
 #ifndef ESPAI_PROVIDER_OLLAMA
-#define ESPAI_PROVIDER_OLLAMA       0
+#define ESPAI_PROVIDER_OLLAMA       1
 #endif
 
 #ifndef ESPAI_MAX_MESSAGES

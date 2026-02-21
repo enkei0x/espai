@@ -7,6 +7,7 @@
 
 #include "HttpTransport.h"
 #include <HTTPClient.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
 namespace ESPAI {
@@ -27,6 +28,7 @@ public:
     void setFollowRedirects(followRedirects_t follow) { _followRedirects = follow; }
 
 private:
+    WiFiClient _plainClient;
     WiFiClientSecure _wifiClient;
     String _lastError;
     const char* _caCert;
@@ -34,6 +36,7 @@ private:
     bool _reuseConnection;
     followRedirects_t _followRedirects;
 
+    static bool isHttps(const String& url);
     void configureSSL();
     bool setupHttpClient(HTTPClient& http, const HttpRequest& request);
     void addHeaders(HTTPClient& http, const HttpRequest& request);

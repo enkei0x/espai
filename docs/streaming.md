@@ -15,7 +15,7 @@ Streaming lets you receive AI responses token-by-token in real-time, providing a
 
 ## Basic Usage
 
-Works the same for both OpenAI and Anthropic:
+Works the same for all providers:
 
 ```cpp
 #include <ESPAI.h>
@@ -24,6 +24,8 @@ using namespace ESPAI;
 // Use any provider
 OpenAIProvider ai("sk-...");
 // or: AnthropicProvider ai("sk-ant-...");
+// or: GeminiProvider ai("AIza...");
+// or: OllamaProvider ai;
 
 void streamResponse() {
     std::vector<Message> messages;

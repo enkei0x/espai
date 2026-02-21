@@ -160,9 +160,25 @@ void test_get_default_base_url_gemini() {
 
 void test_get_default_base_url_ollama() {
     TEST_ASSERT_EQUAL_STRING(
-        "http://localhost:11434/api/chat",
+        "http://localhost:11434/v1/chat/completions",
         ESPAI::ProviderFactory::getDefaultBaseUrl(ESPAI::Provider::Ollama)
     );
+}
+
+void test_create_ollama_provider() {
+    ESPAI::ProviderFactory::registerProvider(ESPAI::Provider::Ollama, createMockProvider);
+    auto provider = ESPAI::ProviderFactory::create(ESPAI::Provider::Ollama, "", "llama3.2");
+
+    TEST_ASSERT_NOT_NULL(provider.get());
+    TEST_ASSERT_EQUAL_STRING("llama3.2", provider->getModel().c_str());
+}
+
+void test_create_ollama_with_default_model() {
+    ESPAI::ProviderFactory::registerProvider(ESPAI::Provider::Ollama, createMockProvider);
+    auto provider = ESPAI::ProviderFactory::create(ESPAI::Provider::Ollama, "");
+
+    TEST_ASSERT_NOT_NULL(provider.get());
+    TEST_ASSERT_EQUAL_STRING(ESPAI_DEFAULT_MODEL_OLLAMA, provider->getModel().c_str());
 }
 
 void test_create_gemini_provider() {
@@ -271,6 +287,9 @@ int main(int argc, char** argv) {
 
     RUN_TEST(test_create_gemini_provider);
     RUN_TEST(test_create_gemini_with_default_model);
+
+    RUN_TEST(test_create_ollama_provider);
+    RUN_TEST(test_create_ollama_with_default_model);
 
     RUN_TEST(test_is_registered_false_initially);
     RUN_TEST(test_multiple_providers);

@@ -39,8 +39,9 @@ Supported AI providers.
 enum class Provider {
     OpenAI,
     Anthropic,
-    Gemini,    // Planned
-    Ollama     // Planned
+    Gemini,
+    Ollama,
+    Custom     // For OpenAI-compatible providers
 };
 ```
 
@@ -305,9 +306,10 @@ struct Tool {
 };
 ```
 
-The same `parametersJson` schema works for both OpenAI and Anthropic:
-- OpenAI maps it to the `parameters` field
+The same `parametersJson` schema works for all providers:
+- OpenAI, Ollama, and OpenAI-compatible providers map it to the `parameters` field
 - Anthropic maps it to the `input_schema` field
+- Gemini maps it to the Gemini function declarations format
 
 ### ToolCall
 
@@ -338,6 +340,106 @@ See [Tool Calling Guide](tool-calling.md) for complete examples.
 
 ---
 
+## OllamaProvider
+
+Provider for local LLMs via Ollama. Extends `OpenAICompatibleProvider` with no API key required.
+
+### Constructor
+
+```cpp
+OllamaProvider(const String& apiKey = "", const String& model = "llama3.2");
+```
+
+### Methods
+
+Inherits all methods from `OpenAICompatibleProvider`. No API key is needed by default.
+
+### Example
+
+```cpp
+OllamaProvider ollama;
+ollama.setModel("mistral");
+ollama.setBaseUrl("http://192.168.1.100:11434/v1/chat/completions");
+
+std::vector<Message> msgs;
+msgs.push_back(Message(Role::User, "Hello!"));
+
+Response resp = ollama.chat(msgs, ChatOptions());
+```
+
+---
+
+## OpenAICompatibleProvider
+
+Base class for any provider that uses the OpenAI chat completions API format. Used directly for custom providers (Groq, DeepSeek, Together AI, LM Studio, OpenRouter, etc.) and as the base for `OpenAIProvider` and `OllamaProvider`.
+
+### OpenAICompatibleConfig
+
+```cpp
+struct OpenAICompatibleConfig {
+    String name;                                    // Provider display name
+    String baseUrl;                                 // API endpoint URL
+    String apiKey;                                  // API key
+    String model;                                   // Default model
+    String authHeaderName = "Authorization";        // Auth header name
+    String authHeaderValuePrefix = "Bearer ";       // Auth header value prefix
+    bool requiresApiKey = true;                     // Whether API key is required
+    bool toolCallingSupported = true;               // Whether provider supports tools
+    Provider providerType = Provider::Custom;       // Provider enum type
+};
+```
+
+### Constructors
+
+```cpp
+// Config-based (recommended for custom providers)
+explicit OpenAICompatibleProvider(const OpenAICompatibleConfig& config);
+
+// Legacy constructor (used by thin subclasses)
+OpenAICompatibleProvider(const String& apiKey, const String& model,
+    const String& baseUrl, const String& name, Provider providerType);
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `chat(messages, options)` | Send chat request, get response |
+| `chatStream(messages, options, callback)` | Stream response token by token |
+| `setModel(model)` | Set default model |
+| `getModel()` | Get current model |
+| `setBaseUrl(url)` | Set custom API endpoint |
+| `setApiKey(key)` | Set API key |
+| `setTimeout(ms)` | Set request timeout |
+| `addTool(tool)` | Register a tool/function |
+| `clearTools()` | Remove all tools |
+| `hasToolCalls()` | Check if last response has tool calls |
+| `getLastToolCalls()` | Get tool calls from last response |
+| `getAssistantMessageWithToolCalls(content)` | Build assistant message with tool calls |
+| `addCustomHeader(name, value)` | Add extra HTTP header |
+| `isConfigured()` | Check if provider is ready to use |
+| `supportsTools()` | Whether tools are supported |
+
+### Example
+
+```cpp
+OpenAICompatibleConfig config;
+config.name = "Groq";
+config.baseUrl = "https://api.groq.com/openai/v1/chat/completions";
+config.apiKey = "gsk-...";
+config.model = "llama-3.3-70b-versatile";
+
+OpenAICompatibleProvider ai(config);
+ai.addCustomHeader("X-Custom-Header", "value");
+
+std::vector<Message> msgs;
+msgs.push_back(Message(Role::User, "Hello!"));
+
+Response resp = ai.chat(msgs, ChatOptions());
+```
+
+---
+
 ## ProviderFactory
 
 Create providers dynamically.
@@ -357,11 +459,11 @@ bool registered = ProviderFactory::isRegistered(Provider::OpenAI);
 
 ## HttpTransportESP32
 
-Low-level HTTP transport for ESP32. Most users won't need to interact with this directly.
+Low-level HTTP transport for ESP32. Most users won't need to interact with this directly. Supports both HTTPS (for cloud APIs) and plain HTTP (for local providers like Ollama).
 
 ### SSL/TLS Configuration
 
-ESPAI validates SSL certificates by default using built-in root CA certificates that cover api.openai.com and api.anthropic.com.
+ESPAI validates SSL certificates by default using built-in root CA certificates that cover api.openai.com and api.anthropic.com. Plain HTTP is used automatically for `http://` URLs (e.g., local Ollama).
 
 ```cpp
 #include <ESPAI.h>
@@ -389,7 +491,8 @@ transport->setInsecure(true);  // Logs a warning
 
 ### Security Notes
 
-- **Default behavior:** SSL certificate validation is ENABLED
+- **Default behavior:** SSL certificate validation is ENABLED for HTTPS URLs
+- **Plain HTTP:** Used automatically for `http://` URLs (local providers) — no SSL overhead
 - **Built-in certificates:** DigiCert Global Root CA and ISRG Root X1 (valid until 2031+)
 - **setInsecure(true):** Logs a warning and disables validation - use only for testing
 - **Custom endpoints:** Use `setCACert()` with appropriate certificates

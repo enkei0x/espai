@@ -11,18 +11,18 @@
   <a href="https://www.arduino.cc/"><img src="https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino" alt="Arduino"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.espressif.com/"><img src="https://img.shields.io/badge/ESP32-Supported-green?logo=espressif" alt="ESP32"></a>
-  <img src="https://img.shields.io/badge/Tests-390%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-445%20passed-brightgreen" alt="Tests">
 </p>
 
-> 🚀 Bring the power of GPT, Claude and Gemini to your ESP32 projects!
+> 🚀 Bring the power of GPT, Claude, Gemini and local LLMs to your ESP32 projects!
 
-ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI, Anthropic and Google Gemini APIs into your ESP32 projects. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
+ESPAI is a lightweight, easy-to-use Arduino library that lets you integrate OpenAI, Anthropic, Google Gemini and Ollama APIs into your ESP32 projects. Build smart IoT devices, voice assistants, and AI-powered gadgets with just a few lines of code.
 
 ```cpp
 #include <ESPAI.h>
 using namespace ESPAI;
 
-OpenAIProvider ai("sk-your-key");  // or AnthropicProvider / GeminiProvider
+OpenAIProvider ai("sk-your-key");  // or AnthropicProvider / GeminiProvider / OllamaProvider
 
 std::vector<Message> messages = { Message(Role::User, "Hello from ESP32!") };
 
@@ -36,14 +36,15 @@ Serial.println(res.content);
 ## ✨ Features
 
 - 🎯 **Simple API** — Clean, intuitive interface for chat completions
-- 🔒 **Secure by Default** — Embedded root CA certificates for proper TLS verification (no `setInsecure()` hacks)
+- 🔒 **Secure by Default** — Embedded root CA certificates for proper TLS verification
 - 🌊 **Streaming Support** — Real-time token-by-token responses via SSE
 - 🛠️ **Tool Calling** — Function calling for agentic workflows with unified schema across all providers
 - 💬 **Conversation History** — Built-in multi-turn context management with auto-pruning and serialization
-- 🔄 **Multiple Providers** — OpenAI, Anthropic (Claude) and Google Gemini through a single unified API
+- 🔄 **Multiple Providers** — OpenAI, Anthropic (Claude), Google Gemini, Ollama and any OpenAI-compatible API through a single unified interface
+- 🏠 **Local LLMs** — Run models locally with Ollama, no API key or internet required
 - 📦 **Lightweight** — Minimal memory footprint, optimized for ESP32
 - ⚡ **Non-blocking** — Async-friendly design
-- 🧪 **Well Tested** — 390+ native unit tests, CI-ready
+- 🧪 **Well Tested** — 445+ native unit tests, CI-ready
 - 🏗️ **Clean Architecture** — Layered design with separated HTTP transport, providers, and conversation management
 
 ---
@@ -51,9 +52,9 @@ Serial.println(res.content);
 ## 🏆 Why ESPAI?
 
 - **Secure by design** — Embedded root CA certificates for proper TLS verification out of the box
-- **Production-ready** — 390+ unit tests running natively, so you can refactor and ship with confidence
+- **Production-ready** — 445+ unit tests running natively, so you can refactor and ship with confidence
 - **Conversation memory** — Built-in multi-turn history with automatic pruning and JSON serialization
-- **Write once, run on any provider** — Define tools once, unified schema works across OpenAI, Claude, and Gemini
+- **Write once, run on any provider** — Define tools once, unified schema works across OpenAI, Claude, Gemini, and Ollama
 - **Your choice of tooling** — First-class support for both PlatformIO and Arduino IDE
 - **Modern C++17** — Namespaced, clean layered architecture that's easy to extend and debug
 
@@ -227,6 +228,18 @@ claude.setModel("claude-sonnet-4-20250514");
 // Google Gemini
 GeminiProvider gemini("AIza...");
 gemini.setModel("gemini-2.5-flash");
+
+// Ollama (local, no API key needed)
+OllamaProvider ollama;
+ollama.setModel("llama3.2");
+
+// Any OpenAI-compatible API (Groq, DeepSeek, Together AI, etc.)
+OpenAICompatibleConfig config;
+config.name = "Groq";
+config.baseUrl = "https://api.groq.com/openai/v1/chat/completions";
+config.apiKey = "gsk-...";
+config.model = "llama-3.3-70b-versatile";
+OpenAICompatibleProvider groq(config);
 ```
 
 ---
@@ -243,10 +256,12 @@ ESPAI is optimized for constrained environments:
 
 💡 **Tip:** Use streaming for long responses to reduce peak memory usage.
 
-To save ~10KB flash, disable unused providers:
+To save flash, disable unused providers:
 
 ```cpp
-#define ESPAI_PROVIDER_ANTHROPIC 0  // Disable Anthropic
+#define ESPAI_PROVIDER_ANTHROPIC 0
+#define ESPAI_PROVIDER_GEMINI 0
+#define ESPAI_PROVIDER_OLLAMA 0
 #include <ESPAI.h>
 ```
 
@@ -280,11 +295,13 @@ To save ~10KB flash, disable unused providers:
 
 - [x] OpenAI provider
 - [x] Anthropic (Claude) provider
+- [x] Google Gemini provider
+- [x] Ollama provider (local LLMs)
+- [x] OpenAI-compatible base (Groq, DeepSeek, Together AI, LM Studio, OpenRouter, etc.)
 - [x] Streaming support
 - [x] Tool/function calling
 - [x] Conversation history management
-- [ ] **Ollama** — Local LLM support (run models on your own server)
-- [x] **Gemini** — Google AI integration
+- [x] Plain HTTP transport (for local providers)
 - [ ] Vision support (image inputs)
 - [ ] Embeddings API
 
@@ -316,6 +333,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [OpenAI](https://openai.com/) — GPT models
 - [Anthropic](https://anthropic.com/) — Claude models
 - [Google Gemini](https://ai.google.dev/) — Gemini models
+- [Ollama](https://ollama.com/) — Local LLM runtime
 
 ---
 
