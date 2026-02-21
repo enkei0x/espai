@@ -203,6 +203,29 @@ resp = openai.chat(conv.getMessages(), options);
 
 ---
 
+## ⚡ Async Requests
+
+Run AI requests in the background without blocking your main loop:
+
+```cpp
+AIClient client(Provider::OpenAI, "sk-your-api-key");
+
+// Fire-and-forget with callback
+client.chatAsync("Hello!", [](const Response& resp) {
+    Serial.println(resp.content);
+});
+
+// Or poll manually
+ChatRequest* req = client.chatAsync("Hello!");
+while (!req->isComplete()) {
+    req->poll();
+    // ... do other work
+}
+Serial.println(req->getResult().content);
+```
+
+---
+
 ## ⚙️ Configuration
 
 ### ChatOptions
