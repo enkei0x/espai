@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-23
+
+### Added
+- `maxCompletionTokens` field in `ChatOptions` for OpenAI reasoning models (o1, o3, gpt-5+)
+- `OllamaChat` example
+
+### Fixed
+- Optional API parameters (`temperature`, `topP`, `maxTokens`) were always sent with hardcoded defaults, causing errors with OpenAI reasoning models (o1, o3, gpt-5+) — now only sent when explicitly set
+- Anthropic `max_tokens` fallback changed from 1024 to 4096
+
 ## [0.8.0] - 2026-02-21
 
 ### Added
@@ -24,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated documentation to reflect all current features and correct API signatures
 - Expanded `keywords.txt` with all provider, tool, and async keywords
-- Updated test count badge to 457+
+- Updated test count badge
 
 ### Fixed
 - `ChatOptions::maxTokens` default documented as 0, actually 1024
@@ -75,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples: `BasicChat`, `StreamingChat`, `ConversationHistory`, `ToolCalling`, `CustomOptions`, `ErrorHandling`
 - Documentation: API reference, providers guide, streaming guide, tool calling guide, troubleshooting
 
-[Unreleased]: https://github.com/enkei0x/espai/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/enkei0x/espai/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/enkei0x/espai/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/enkei0x/espai/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/enkei0x/espai/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/enkei0x/espai/compare/v0.6.0...v0.6.1

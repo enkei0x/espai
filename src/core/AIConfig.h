@@ -90,8 +90,8 @@
 #endif
 
 #define ESPAI_VERSION_MAJOR     0
-#define ESPAI_VERSION_MINOR     8
+#define ESPAI_VERSION_MINOR     9
 #define ESPAI_VERSION_PATCH     0
-#define ESPAI_VERSION_STRING    "0.8.0"
+#define ESPAI_VERSION_STRING    "0.9.0"
 
 #endif // ESPAI_AI_CONFIG_H
