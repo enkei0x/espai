@@ -7,11 +7,12 @@
 </p>
 
 <p align="center">
-  <a href="https://platformio.org/"><img src="https://img.shields.io/badge/PlatformIO-Compatible-orange?logo=platformio" alt="PlatformIO"></a>
+  <a href="https://registry.platformio.org/libraries/enkei0x/ESPAI"><img src="https://badges.registry.platformio.org/packages/enkei0x/library/ESPAI.svg" alt="PlatformIO Registry"></a>
   <a href="https://www.arduino.cc/"><img src="https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino" alt="Arduino"></a>
+  <img src="https://img.shields.io/badge/C%2B%2B-17-blue?logo=cplusplus" alt="C++17">
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.espressif.com/"><img src="https://img.shields.io/badge/ESP32-Supported-green?logo=espressif" alt="ESP32"></a>
-  <img src="https://img.shields.io/badge/Tests-457%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-451%20passed-brightgreen" alt="Tests">
 </p>
 
 > 🚀 Bring the power of GPT, Claude, Gemini and local LLMs to your ESP32 projects!
@@ -45,7 +46,7 @@ Serial.println(res.content);
 - 📦 **Lightweight** — Minimal memory footprint, optimized for ESP32
 - ⚡ **Async Support** — Non-blocking FreeRTOS-based async chat and streaming
 - 🔁 **Auto Retry** — Built-in retry with exponential backoff for rate limits and server errors
-- 🧪 **Well Tested** — 457+ native unit tests, CI-ready
+- 🧪 **Well Tested** — 451+ native unit tests, CI-ready
 - 🏗️ **Clean Architecture** — Layered design with separated HTTP transport, providers, and conversation management
 
 ---
@@ -53,7 +54,7 @@ Serial.println(res.content);
 ## 🏆 Why ESPAI?
 
 - **Secure by design** — Embedded root CA certificates for proper TLS verification out of the box
-- **Production-ready** — 457+ unit tests running natively, so you can refactor and ship with confidence
+- **Production-ready** — 451+ unit tests running natively, so you can refactor and ship with confidence
 - **Conversation memory** — Built-in multi-turn history with automatic pruning and JSON serialization
 - **Write once, run on any provider** — Define tools once, unified schema works across OpenAI, Claude, Gemini, and Ollama
 - **Your choice of tooling** — First-class support for both PlatformIO and Arduino IDE
@@ -230,15 +231,18 @@ Serial.println(req->getResult().content);
 
 ### ChatOptions
 
+Parameters are only sent to the API when explicitly set. If you leave a parameter at its default, the provider's own default is used.
+
 ```cpp
 ChatOptions options;
-options.temperature = 0.7;       // Creativity (0.0 - 2.0)
-options.maxTokens = 1024;        // Max response length
-options.topP = 0.9;              // Nucleus sampling
-options.frequencyPenalty = 0.0;  // Reduce repetition
-options.presencePenalty = 0.0;   // Encourage new topics
-options.model = "gpt-4.1-mini";   // Model override
-options.systemPrompt = "...";    // System instructions
+options.temperature = 0.7;            // Creativity (0.0 - 2.0)
+options.maxTokens = 1024;             // Max response length
+options.maxCompletionTokens = 4096;   // OpenAI reasoning models (o1, o3); priority over maxTokens
+options.topP = 0.9;                   // Nucleus sampling
+options.frequencyPenalty = 0.5;       // Reduce repetition (-2.0 - 2.0)
+options.presencePenalty = 0.3;        // Encourage new topics (-2.0 - 2.0)
+options.model = "gpt-4.1-mini";      // Model override
+options.systemPrompt = "...";        // System instructions
 ```
 
 ### Provider Setup

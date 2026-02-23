@@ -142,8 +142,6 @@ void test_build_request_without_top_p_when_default() {
     messages.push_back(Message(Role::User, "Test"));
 
     ChatOptions options;
-    options.topP = 1.0f;
-
     String body = provider->buildRequestBody(messages, options);
 
     TEST_ASSERT_TRUE(body.find("\"topP\"") == std::string::npos);

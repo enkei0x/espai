@@ -111,13 +111,17 @@ String OpenAICompatibleProvider::buildRequestBody(
 #endif
     }
 
-    doc["temperature"] = roundFloat(options.temperature);
+    if (options.temperature >= 0.0f) {
+        doc["temperature"] = roundFloat(options.temperature);
+    }
 
-    if (options.maxTokens > 0) {
+    if (options.maxCompletionTokens > 0) {
+        doc["max_completion_tokens"] = static_cast<int>(options.maxCompletionTokens);
+    } else if (options.maxTokens > 0) {
         doc["max_tokens"] = static_cast<int>(options.maxTokens);
     }
 
-    if (options.topP < 1.0f) {
+    if (options.topP >= 0.0f) {
         doc["top_p"] = roundFloat(options.topP);
     }
 

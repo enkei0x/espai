@@ -197,6 +197,7 @@ struct Response {
 struct ChatOptions {
     float temperature;
     int16_t maxTokens;
+    int32_t maxCompletionTokens; // OpenAI reasoning models (o1, o3, gpt-5+): use max_completion_tokens instead of max_tokens
     String model;
     String systemPrompt;
     float topP;
@@ -205,11 +206,12 @@ struct ChatOptions {
     int32_t thinkingBudget; // Gemini 2.5+: thinking token budget. -1 = provider default, 0 = disable thinking.
 
     ChatOptions()
-        : temperature(0.7f)
-        , maxTokens(1024)
+        : temperature(-1.0f)
+        , maxTokens(0)
+        , maxCompletionTokens(0)
         , model()
         , systemPrompt()
-        , topP(1.0f)
+        , topP(-1.0f)
         , frequencyPenalty(0.0f)
         , presencePenalty(0.0f)
         , thinkingBudget(-1) {}

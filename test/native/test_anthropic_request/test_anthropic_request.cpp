@@ -41,7 +41,7 @@ void test_build_request_max_tokens_required() {
 
     String body = provider->buildRequestBody(messages, options);
 
-    TEST_ASSERT_TRUE(body.find("\"max_tokens\":1024") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("\"max_tokens\":4096") != std::string::npos);
 }
 
 void test_build_request_system_as_separate_field() {
@@ -140,8 +140,6 @@ void test_build_request_without_temperature_when_default() {
     messages.push_back(Message(Role::User, "Test"));
 
     ChatOptions options;
-    options.temperature = 0.7f;
-
     String body = provider->buildRequestBody(messages, options);
 
     TEST_ASSERT_TRUE(body.find("\"temperature\"") == std::string::npos);
@@ -164,8 +162,6 @@ void test_build_request_without_top_p_when_default() {
     messages.push_back(Message(Role::User, "Test"));
 
     ChatOptions options;
-    options.topP = 1.0f;
-
     String body = provider->buildRequestBody(messages, options);
 
     TEST_ASSERT_TRUE(body.find("\"top_p\"") == std::string::npos);

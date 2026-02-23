@@ -147,13 +147,15 @@ String GeminiProvider::buildRequestBody(
 
     JsonObject genConfig = doc["generationConfig"].to<JsonObject>();
 
-    genConfig["temperature"] = roundFloat(options.temperature);
+    if (options.temperature >= 0.0f) {
+        genConfig["temperature"] = roundFloat(options.temperature);
+    }
 
     if (options.maxTokens > 0) {
         genConfig["maxOutputTokens"] = static_cast<int>(options.maxTokens);
     }
 
-    if (options.topP < 1.0f) {
+    if (options.topP >= 0.0f) {
         genConfig["topP"] = roundFloat(options.topP);
     }
 
