@@ -46,7 +46,7 @@ String AnthropicProvider::buildRequestBody(
     String model = options.model.isEmpty() ? _model : options.model;
     doc["model"] = model.c_str();
 
-    int16_t maxTokens = options.maxTokens > 0 ? options.maxTokens : 1024;
+    int16_t maxTokens = options.maxTokens > 0 ? options.maxTokens : 4096;
     doc["max_tokens"] = static_cast<int>(maxTokens);
 
     String systemPrompt = extractSystemPrompt(messages);
@@ -87,11 +87,11 @@ String AnthropicProvider::buildRequestBody(
 #endif
     }
 
-    if (options.temperature != 0.7f) {
+    if (options.temperature >= 0.0f) {
         doc["temperature"] = roundFloat(options.temperature);
     }
 
-    if (options.topP < 1.0f) {
+    if (options.topP >= 0.0f) {
         doc["top_p"] = roundFloat(options.topP);
     }
 

@@ -80,9 +80,10 @@ void test_response_total_tokens_zero() {
 
 void test_chat_options_defaults() {
     ESPAI::ChatOptions opts;
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.7f, opts.temperature);
-    TEST_ASSERT_EQUAL(1024, opts.maxTokens);
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 1.0f, opts.topP);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -1.0f, opts.temperature);
+    TEST_ASSERT_EQUAL(0, opts.maxTokens);
+    TEST_ASSERT_EQUAL(0, opts.maxCompletionTokens);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, -1.0f, opts.topP);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, opts.frequencyPenalty);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, opts.presencePenalty);
     TEST_ASSERT_TRUE(opts.model.isEmpty());

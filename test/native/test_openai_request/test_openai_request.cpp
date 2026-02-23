@@ -102,8 +102,6 @@ void test_build_request_without_top_p_when_default() {
     messages.push_back(Message(Role::User, "Test"));
 
     ChatOptions options;
-    options.topP = 1.0f;
-
     String body = provider->buildRequestBody(messages, options);
 
     TEST_ASSERT_TRUE(body.find("\"top_p\"") == std::string::npos);
@@ -372,6 +370,65 @@ void test_full_tool_calling_flow() {
 }
 #endif
 
+void test_build_request_without_temperature_when_default() {
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "Test"));
+
+    ChatOptions options;
+    String body = provider->buildRequestBody(messages, options);
+
+    TEST_ASSERT_TRUE(body.find("\"temperature\"") == std::string::npos);
+}
+
+void test_build_request_temperature_zero_is_sent() {
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "Test"));
+
+    ChatOptions options;
+    options.temperature = 0.0f;
+
+    String body = provider->buildRequestBody(messages, options);
+
+    TEST_ASSERT_TRUE(body.find("\"temperature\":0") != std::string::npos);
+}
+
+void test_build_request_max_completion_tokens() {
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "Test"));
+
+    ChatOptions options;
+    options.maxCompletionTokens = 500;
+
+    String body = provider->buildRequestBody(messages, options);
+
+    TEST_ASSERT_TRUE(body.find("\"max_completion_tokens\":500") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("\"max_tokens\"") == std::string::npos);
+}
+
+void test_build_request_max_completion_tokens_priority() {
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "Test"));
+
+    ChatOptions options;
+    options.maxCompletionTokens = 500;
+    options.maxTokens = 1000;
+
+    String body = provider->buildRequestBody(messages, options);
+
+    TEST_ASSERT_TRUE(body.find("\"max_completion_tokens\":500") != std::string::npos);
+    TEST_ASSERT_TRUE(body.find("\"max_tokens\"") == std::string::npos);
+}
+
+void test_build_request_without_max_tokens_when_default() {
+    std::vector<Message> messages;
+    messages.push_back(Message(Role::User, "Test"));
+
+    ChatOptions options;
+    String body = provider->buildRequestBody(messages, options);
+
+    TEST_ASSERT_TRUE(body.find("\"max_tokens\"") == std::string::npos);
+}
+
 void test_build_http_request_url() {
     std::vector<Message> messages;
     messages.push_back(Message(Role::User, "Test"));
@@ -457,6 +514,11 @@ int main(int argc, char** argv) {
     RUN_TEST(test_build_request_with_frequency_penalty);
     RUN_TEST(test_build_request_with_presence_penalty);
     RUN_TEST(test_build_request_no_penalties_when_zero);
+    RUN_TEST(test_build_request_without_temperature_when_default);
+    RUN_TEST(test_build_request_temperature_zero_is_sent);
+    RUN_TEST(test_build_request_max_completion_tokens);
+    RUN_TEST(test_build_request_max_completion_tokens_priority);
+    RUN_TEST(test_build_request_without_max_tokens_when_default);
 
 #if ESPAI_ENABLE_TOOLS
     RUN_TEST(test_build_request_with_tools);
